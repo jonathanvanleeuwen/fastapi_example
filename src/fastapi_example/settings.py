@@ -1,6 +1,5 @@
 import base64
 import json
-import logging
 from functools import lru_cache
 from typing import Literal
 
@@ -17,19 +16,10 @@ class Settings(BaseSettings):
     # CORS
     cors_allow_origins: tuple = ("*",)
 
-    # LLM API
-    model_name: str = "gemini-2.5-flash"
-    openai_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
-    openai_api_key: str
-
-    # Prompt templates
-    extraction_system_prompt: str = ""  # Set in load_system_prompt
-
     # Authentication settings
-    api_keys: dict[str, str] | str = ""
-
-    # logging
-    app_log_level: int = logging.INFO  # 20: info, 10: debug
+    api_keys: dict[str, str] | str = (
+        "eyJ0ZXN0IjogeyJ1c2VybmFtZSI6ICJKb25hdGhhbiIsICJyb2xlcyI6IFsiYWRtaW4iLCAidXNlciJdfSwgInRlc3QyIjogeyJ1c2VybmFtZSI6ICJib2IiLCAicm9sZXMiOiBbInVzZXIiXX19"
+    )
 
     # Validate that all api key values are unique
     @model_validator(mode="after")
