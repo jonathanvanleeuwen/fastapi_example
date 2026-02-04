@@ -2,6 +2,7 @@ import logging
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 
 from fastapi_example.auth.authentication import auth_admin, auth_user
 from fastapi_example.custom_logger.setup.setup_logger import setup_logging
@@ -29,6 +30,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Add redirect from root to docs
+@app.get("/")
+def root() -> RedirectResponse:
+    return RedirectResponse(url="/docs")
+
 
 # Add routers
 app.include_router(fastapi_router, dependencies=[Depends(auth_admin)])
