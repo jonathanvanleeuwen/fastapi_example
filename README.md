@@ -1,31 +1,311 @@
 # fastapi_example
-A Python library with modern CI/CD setup.
+
+A FastAPI template application with modern authentication, worker pattern, and CI/CD setup.
+
+## 📚 Documentation
+
+- **[Setup Checklist](SETUP_CHECKLIST.md)** - Step-by-step setup guide for beginners
+- **[Architecture Overview](ARCHITECTURE.md)** - Understanding how the app is structured
+- **[Quick Reference](QUICK_REFERENCE.md)** - Commands, endpoints, and common tasks at a glance
+- **[Usage Examples](USAGE_EXAMPLES.md)** - Practical code examples for API requests
+- **[Extending Guide](EXTENDING.md)** - Step-by-step guide for adding new features
+- **[Changes Summary](CHANGES.md)** - Overview of recent enhancements
+
+---
 
 ## Features
+
+### Core Features
+* **Worker/Service Layer Pattern**: Clean separation between API routes and business logic
+* **Dual Authentication System**:
+  - API Key authentication for simple service-to-service auth
+  - OAuth 2.0 support for Google, Azure AD, and GitHub
+* **Sample Math Operations API**: Template endpoints demonstrating the worker pattern
+* **Modern Python Packaging**: Using pyproject.toml with proper dependency management
+
+### Development & CI/CD
 * Automated testing on PR using GitHub Actions
 * Pre-commit hooks for code quality (ruff, isort, trailing whitespace, etc.)
 * Semantic release using GitHub Actions
 * Automatic code coverage report in README
 * Automatic wheel build and GitHub Release publishing
-* Modern Python packaging with pyproject.toml
 
-*Notes*
-Workflows trigger when a branch is merged into main!
-To install, please follow all the instructions in this readme.
-The workflows require a PAT set as secret (see further down for instructions)
-See the notes on how to create semantic releases at the bottom of the README.
+*Notes*:
+- Workflows trigger when a branch is merged into main
+- This template is designed for juniors to understand and extend
+- Code is intentionally simple and well-structured
 
-If you followed all the steps, whenever a PR is merged into `main`, the workflows are triggered and should:
-* Run pre-commit checks (fail fast on code quality issues)
-* Ensure that tests pass (before merge)
-* Create a code coverage report and commit that to the bottom of the README
-* Create a semantic release (if you follow the semantic release pattern) and automatically update the version number of your code
-* Build a wheel and publish it as a GitHub Release asset
+---
 
+## Quick Start
 
-# Installation
+### Running the Application
 
-## Option 1: Install from Private GitHub Release (Recommended)
+1. Install dependencies:
+   ```bash
+   pip install -e ".[dev]"
+   ```
+
+2. Run the development server:
+   ```bash
+   python dev_server.py
+   ```
+
+3. Visit the interactive API docs at http://localhost:8000/docs
+
+---
+
+## Authentication
+
+This application supports two authentication methods:
+
+### 1. API Key Authentication (Recommended for service-to-service)
+
+API keys are stored in a base64-encoded JSON structure. This keeps secrets out of your code!
+
+#### How API Keys Work
+
+The `secrets.json` file (or `FASTAPI_EXAMPLE_API_KEYS` environment variable) contains:
+```json
+{
+    "your_secret_key_here": {
+        "username": "John Doe",
+        "roles": ["admin", "user"]
+    },
+    "another_secret_key": {
+        "username": "Jane Smith",
+        "roles": ["user"]
+    }
+}
+```
+
+**How to use:**
+1. The keys (like `"your_secret_key_here"`) are the actual API keys users send
+2. Each key has a username and list of roles
+3. Endpoints can require specific roles (e.g., only "admin" can access certain routes)
+
+#### Setting Up API Keys
+
+**Option 1: Environment Variable (Production)**
+```bash
+# Encode your secrets.json to base64
+python -c "import base64, json; print(base64.b64encode(json.dumps({'key1': {'username': 'user1', 'roles': ['admin']}}).encode()).decode())"
+
+# Set as environment variable
+export FASTAPI_EXAMPLE_API_KEYS="<base64_encoded_string>"
+```
+
+**Option 2: Direct JSON (Development)**
+See `src/fastapi_example/auth/secrets_example.json` for the structure.
+
+#### Using API Keys in Requests
+
+```bash
+curl -X POST "http://localhost:8000/fastapi_example/add" \
+  -H "Authorization: Bearer your_secret_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{"A": 10, "B": 5}'
+```
+
+### 2. OAuth Authentication (For user login flows)
+
+OAuth allows users to log in with their Google, Azure AD, or GitHub accounts.
+
+#### OAuth Setup
+
+1. **Get OAuth credentials** from your provider:
+   - Google: [Google Cloud Console](https://console.cloud.google.com/)
+   - Azure: [Azure Portal](https://portal.azure.com/)
+   - GitHub: [GitHub OAuth Apps](https://github.com/settings/developers)
+
+2. **Set environment variables**:
+   ```bash
+   export FASTAPI_EXAMPLE_OAUTH_CLIENT_ID="your_client_id"
+   export FASTAPI_EXAMPLE_OAUTH_CLIENT_SECRET="your_client_secret"
+   export FASTAPI_EXAMPLE_OAUTH_SECRET_KEY="your-secret-key-min-32-chars"
+
+   # For Azure only:
+   export FASTAPI_EXAMPLE_OAUTH_TENANT_ID="your_tenant_id"
+   ```
+
+#### OAuth Flow (How it works)
+
+1. **Get authorization URL**:
+   ```bash
+   curl -X POST "http://localhost:8000/auth/oauth/authorize" \
+     -H "Content-Type: application/json" \
+     -d '{"provider": "google", "redirect_uri": "http://localhost/callback"}'
+   ```
+
+2. **User visits the URL** and authorizes your app
+
+3. **Exchange code for token**:
+   ```bash
+   curl -X POST "http://localhost:8000/auth/oauth/token" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "provider": "google",
+       "code": "authorization_code_from_step_2",
+       "redirect_uri": "http://localhost/callback"
+     }'
+   ```
+
+4. **Use the access token** in subsequent requests:
+   ```bash
+   curl -X POST "http://localhost:8000/fastapi_example/add" \
+     -H "Authorization: Bearer <access_token>" \
+     -H "Content-Type: application/json" \
+     -d '{"A": 10, "B": 5}'
+   ```
+
+---
+
+## Project Structure
+
+```
+fastapi_example/
+├── src/fastapi_example/
+│   ├── auth/                      # Authentication modules
+│   │   ├── api_key_auth.py       # API key authentication
+│   │   ├── oauth_auth.py         # OAuth authentication
+│   │   └── secrets_example.json  # Example API keys structure
+│   ├── routers/                   # API route definitions
+│   │   ├── production.py         # Production endpoints
+│   │   ├── testing.py            # Test endpoints (dev only)
+│   │   └── oauth.py              # OAuth flow endpoints
+│   ├── workers/                   # Business logic layer
+│   │   └── math_operations.py   # Example: Math operations
+│   ├── models/                    # Pydantic models
+│   │   └── input.py              # Request/response models
+│   ├── custom_logger/            # Logging configuration
+│   ├── main.py                    # Application entry point
+│   └── settings.py               # Configuration management
+├── tests/
+│   ├── conftest.py               # Shared test fixtures
+│   └── unit/                     # Unit tests
+└── pyproject.toml                # Dependencies and metadata
+```
+
+### Understanding the Worker Pattern
+
+The **worker** (or service layer) separates your business logic from your API routes:
+
+```python
+# ❌ BAD: Business logic in the route
+@app.post("/add")
+def add(data: InputData):
+    result = data.A + data.B  # Logic mixed with routing
+    return {"result": result}
+
+# ✅ GOOD: Business logic in worker
+@app.post("/add")
+def add(data: InputData):
+    result = add_numbers(data.A, data.B)  # Clean separation
+    return {"result": result}
+```
+
+**Benefits:**
+- Easy to test business logic independently
+- Reuse logic across multiple endpoints
+- Clear responsibility: routes handle HTTP, workers handle business logic
+
+---
+
+## API Endpoints
+
+### Math Operations (Requires Admin Role)
+
+All endpoints accept JSON with `A` and `B` numbers:
+
+- `POST /fastapi_example/add` - Add two numbers
+- `POST /fastapi_example/subtract` - Subtract B from A
+- `POST /fastapi_example/multiply` - Multiply two numbers
+- `POST /fastapi_example/divide` - Divide A by B
+
+**Example:**
+```bash
+curl -X POST "http://localhost:8000/fastapi_example/multiply" \
+  -H "Authorization: Bearer test" \
+  -H "Content-Type: application/json" \
+  -d '{"A": 7, "B": 6}'
+
+# Response: {"operation": "multiply", "a": 7, "b": 6, "result": 42}
+```
+
+### OAuth Endpoints (No Auth Required)
+
+- `POST /auth/oauth/authorize` - Get authorization URL
+- `POST /auth/oauth/token` - Exchange code for token
+
+---
+
+## Development
+
+### Running Tests
+
+```bash
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=fastapi_example --cov-report=html
+
+# Run specific test file
+pytest tests/unit/test_workers.py
+```
+
+### Adding New Endpoints
+
+1. **Add business logic** to a worker:
+   ```python
+   # src/fastapi_example/workers/my_worker.py
+   def process_data(input: str) -> str:
+       return input.upper()
+   ```
+
+2. **Create the route**:
+   ```python
+   # src/fastapi_example/routers/production.py
+   from fastapi_example.workers.my_worker import process_data
+
+   @router.post("/process")
+   def process(data: str):
+       result = process_data(data)
+       return {"result": result}
+   ```
+
+3. **Add tests**:
+   ```python
+   # tests/unit/test_my_worker.py
+   def test_process_data():
+       assert process_data("hello") == "HELLO"
+   ```
+
+### Environment Variables
+
+Create a `.env` file for local development:
+
+```bash
+# App settings
+FASTAPI_EXAMPLE_STAGE=development
+
+# API Keys (base64 encoded JSON)
+FASTAPI_EXAMPLE_API_KEYS="eyJ0ZXN0Ijp7InVzZXJuYW1lIjoiSm9uYXRoYW4iLCJyb2xlcyI6WyJhZG1pbiIsInVzZXIiXX19"
+
+# OAuth (optional - only if using OAuth)
+FASTAPI_EXAMPLE_OAUTH_CLIENT_ID=your_client_id
+FASTAPI_EXAMPLE_OAUTH_CLIENT_SECRET=your_client_secret
+FASTAPI_EXAMPLE_OAUTH_SECRET_KEY=your-secret-key-min-32-chars
+FASTAPI_EXAMPLE_OAUTH_TENANT_ID=your_tenant_id  # Azure only
+```
+
+---
+
+---
+
+## Installation (For Distribution)
+
+### Option 1: Install from Private GitHub Release (Recommended)
 Since this is a private repository, you need to authenticate with a GitHub Personal Access Token (PAT).
 
 ### Configure git credentials (more secure, recommended)
@@ -119,135 +399,33 @@ python -m build --wheel
 ```
 
 
-# Development Setup
+---
 
-1. Create new virtual environment
-   ```bash
-   python -m venv .venv
-   ```
-2. Activate the environment and install library with dev dependencies
-   ```bash
-   pip install -e ".[dev]"
-   ```
-3. Install pre-commit hooks
+# Pre-commit Setup (For Contributors)
+
+This project uses pre-commit hooks to ensure code quality.
+
+1. Install pre-commit:
    ```bash
    pip install pre-commit
    pre-commit install
    ```
-4. Run pre-commit on all files to ensure everything is properly set up
+
+2. Run on all files (first time):
    ```bash
    pre-commit run --all-files
    ```
-5. Check proper install by running tests
-   ```bash
-   pytest
-   ```
 
+Pre-commit will now run automatically on every commit, checking:
+- Code formatting (ruff)
+- Import sorting (isort)
+- Trailing whitespace
+- YAML/JSON syntax
+- And more...
 
-# GitHub Repository Setup
+---
 
-Complete these steps in order to enable the CI/CD pipeline.
-
-## Step 1: Create the Release Token (PAT)
-
-The workflow needs a Personal Access Token to push to the protected `main` branch.
-
-### Create a Fine-Grained PAT (Recommended - More Secure)
-
-1. Go to [GitHub Settings → Developer settings → Personal access tokens → Fine-grained tokens](https://github.com/settings/tokens?type=beta)
-2. Click **"Generate new token"**
-3. Configure the token:
-   - **Token name:** `RELEASE_TOKEN_fastapi_example` (or similar descriptive name)
-   - **Expiration:** Choose an appropriate duration (recommend 90 days, set a reminder to rotate)
-   - **Repository access:** Select "Only select repositories" → choose this repository
-   - **Permissions:**
-     - **Contents:** Read and write (for pushing commits and tags)
-     - **Metadata:** Read-only (automatically selected)
-4. Click **"Generate token"**
-5. **Copy the token immediately** - you won't see it again!
-
-### Alternative: Classic PAT (Simpler but Broader Access)
-
-If fine-grained tokens don't work for your use case:
-
-1. Go to [GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)](https://github.com/settings/tokens)
-2. Click **"Generate new token (classic)"**
-3. Configure:
-   - **Note:** `RELEASE_TOKEN_fastapi_example`
-   - **Expiration:** Set an appropriate duration
-   - **Scopes:** Select `repo` (full control of private repositories)
-4. Click **"Generate token"** and copy it
-
-## Step 2: Add the Token as a Repository Secret
-
-1. Go to your repository on GitHub
-2. Navigate to **Settings → Secrets and variables → Actions**
-3. Click **"New repository secret"**
-4. Configure:
-   - **Name:** `RELEASE_TOKEN`
-   - **Secret:** Paste your copied PAT
-5. Click **"Add secret"**
-
-## Step 3: Configure Branch Protection with Rulesets
-
-GitHub Rulesets provide modern, flexible branch protection. The PAT allows the workflow to bypass these rules while humans must go through PRs.
-
-1. Go to your repository → **Settings → Rules → Rulesets**
-2. Click **"New ruleset"** → **"New branch ruleset"**
-3. Configure the ruleset:
-   - **Ruleset name:** `Protect main`
-   - **Enforcement status:** Active
-   - **Target branches:** Click "Add target" → "Include by pattern" → enter `main`
-
-4. Enable these rules:
-   - ✅ **Restrict deletions** - Prevent branch deletion
-   - ✅ **Require a pull request before merging**
-     - Required approvals: `1` (or more)
-     - ✅ Dismiss stale pull request approvals when new commits are pushed
-     - ✅ Require conversation resolution before merging
-   - ✅ **Require status checks to pass**
-     - ✅ Require branches to be up to date before merging
-     - Add status checks: `test` (from python-app.yml), `lint` (from python-app.yml)
-   - ✅ **Block force pushes**
-
-5. Click **"Create"**
-
-## Step 4: Restrict Allowed Actions (Optional but Recommended)
-
-Limit which GitHub Actions can run to reduce supply chain attack risk:
-
-1. Go to **Settings → Actions → General**
-2. Under "Actions permissions", select **"Allow [owner], and select non-[owner], actions and reusable workflows"**
-3. In "Allow specified actions and reusable workflows", add:
-   ```
-   actions/checkout@*,
-   actions/setup-python@*,
-   MishaKav/pytest-coverage-comment@*,
-   softprops/action-gh-release@*,
-   ```
-4. Click **"Save"**
-
-## Security Model
-
-This setup provides security through multiple layers:
-
-| Protection | What it prevents |
-|------------|------------------|
-| **CODEOWNERS** | Requires your approval for any workflow changes |
-| **Required PRs** | No direct pushes to main (humans must use PRs) |
-| **Required reviews** | At least one approval needed for every change |
-| **Status checks** | Tests must pass before merge |
-| **PAT as secret** | Token only accessible to workflows, not forks |
-| **Action allowlist** | Only trusted actions can run |
-
-**Why is the PAT safe?**
-- The PAT is stored as a secret, never exposed in logs (GitHub auto-masks it)
-- Forks cannot access repository secrets
-- Any attempt to modify workflows to steal the PAT requires your explicit approval via CODEOWNERS
-- The PAT can only push; it cannot change branch protection rules
-
-
-# Semantic Release
+# Semantic Release (For Maintainers)
 
 https://python-semantic-release.readthedocs.io/en/latest/
 

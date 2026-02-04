@@ -16,15 +16,20 @@ class Settings(BaseSettings):
     # CORS
     cors_allow_origins: tuple = ("*",)
 
-    # Authentication settings
+    # API Key Authentication settings
     api_keys: dict[str, str] | str = (
         "eyJ0ZXN0IjogeyJ1c2VybmFtZSI6ICJKb25hdGhhbiIsICJyb2xlcyI6IFsiYWRtaW4iLCAidXNlciJdfSwgInRlc3QyIjogeyJ1c2VybmFtZSI6ICJib2IiLCAicm9sZXMiOiBbInVzZXIiXX19"
     )
 
-    # Validate that all api key values are unique
+    # OAuth settings
+    oauth_secret_key: str = "your-secret-key-min-32-chars-change-in-production"
+    oauth_client_id: str = ""
+    oauth_client_secret: str = ""
+    oauth_tenant_id: str = ""
+    oauth_access_token_expire_minutes: int = 30
+
     @model_validator(mode="after")
     def ensure_unique_values(self) -> "Settings":
-        # base64 decode if string
         if isinstance(self.api_keys, str):
             decoded = base64.b64decode(self.api_keys).decode()
             self.api_keys = json.loads(decoded)
