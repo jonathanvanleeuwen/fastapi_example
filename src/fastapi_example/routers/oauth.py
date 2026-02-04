@@ -2,11 +2,11 @@ import logging
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
 from fastapi_example.auth.oauth_auth import create_access_token, create_oauth_provider
-from fastapi_example.settings import get_settings
+from fastapi_example.settings import Settings, get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,10 @@ class TokenResponse(BaseModel):
 
 
 @oauth_router.post("/authorize", operation_id="get_authorization_url", status_code=200)
-def get_authorization_url(request: AuthorizationRequest) -> dict[str, str]:
+def get_authorization_url(
+    request: AuthorizationRequest,
+    settings: Settings = Depends(get_settings),  # noqa: B008
+) -> dict[str, str]:
     """
     Get the OAuth authorization URL for a specific provider.
 
@@ -43,8 +46,6 @@ def get_authorization_url(request: AuthorizationRequest) -> dict[str, str]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
         ) from e
-
-    settings = get_settings()
     scopes = {
         "google": "openid email profile",
         "azure": "openid email profile",
@@ -55,7 +56,7 @@ def get_authorization_url(request: AuthorizationRequest) -> dict[str, str]:
 
     auth_url = (
         f"{provider.authorization_url}"
-        f"?client_id={provider.client_id}"
+        f"?client_id={settings.oauth_client_id}"
         f"&redirect_uri={request.redirect_uri}"
         f"&response_type=code"
         f"&scope={scope}"

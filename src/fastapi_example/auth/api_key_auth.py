@@ -2,39 +2,35 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
-from fastapi import HTTPException, Request, Security, status
+from fastapi import Depends, HTTPException, Request, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from fastapi_example.settings import get_settings
+from fastapi_example.settings import Settings, get_settings
 
 logger = logging.getLogger(__name__)
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
-def get_bearer_dependency(
-    api_keys: dict[str, dict[str, str | list[str]]],
-    allowed_roles: list[str] | None = None,
-) -> Callable:
+def get_current_user(request: Request) -> dict[str, Any] | None:
+    """Get current user info (works for both API key and OAuth)."""
+    return getattr(request.state, "user_info", None)
+
+
+def create_auth_dependency(allowed_roles: list[str] | None = None) -> Callable:
     """
-    Creates a dependency that validates API key authentication.
+    Creates an API key authentication dependency with optional role checking.
 
     Args:
-        api_keys: Dictionary mapping API keys to user info with structure:
-            {
-                "api_key_string": {
-                    "username": str,
-                    "roles": list[str]
-                }
-            }
         allowed_roles: Optional list of roles. User must have at least one matching role.
 
     Returns:
-        Dependency function that validates the API key and checks roles.
+        FastAPI dependency that validates API key and checks roles.
     """
 
-    async def bearer_auth(
+    async def check_api_key(
         request: Request,
         credentials: HTTPAuthorizationCredentials = Security(bearer_scheme),  # noqa: B008
+        settings: Settings = Depends(get_settings),  # noqa: B008
     ) -> None:
         if credentials is None or credentials.scheme.lower() != "bearer":
             raise HTTPException(
@@ -43,7 +39,7 @@ def get_bearer_dependency(
             )
 
         token = credentials.credentials
-        user_info = api_keys.get(token)
+        user_info = settings.api_keys.get(token)
 
         if user_info is None:
             raise HTTPException(
@@ -70,16 +66,10 @@ def get_bearer_dependency(
         logger.info(f"Authenticated user: {username} with roles {roles}")
         request.state.user_info = user_data
 
-    return bearer_auth
+    return check_api_key
 
 
-def get_current_user(request: Request) -> dict[str, Any] | None:
-    """Get current user info (works for both API key and OAuth)."""
-    return getattr(request.state, "user_info", None)
-
-
-auth_admin = get_bearer_dependency(get_settings().api_keys, allowed_roles=["admin"])
-auth_user = get_bearer_dependency(
-    get_settings().api_keys, allowed_roles=["admin", "user"]
-)
-auth_any = get_bearer_dependency(get_settings().api_keys)
+# Authentication dependencies
+auth_admin = create_auth_dependency(allowed_roles=["admin"])
+auth_user = create_auth_dependency(allowed_roles=["admin", "user"])
+auth_any = create_auth_dependency()

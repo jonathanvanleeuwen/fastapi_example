@@ -31,9 +31,12 @@ def test_settings(test_api_keys):
 @pytest.fixture
 def override_settings(test_settings):
     """Override the get_settings dependency."""
+    # Clear the lru_cache to ensure fresh settings
+    get_settings.cache_clear()
     app.dependency_overrides[get_settings] = lambda: test_settings
     yield
     app.dependency_overrides.clear()
+    get_settings.cache_clear()
 
 
 @pytest.fixture

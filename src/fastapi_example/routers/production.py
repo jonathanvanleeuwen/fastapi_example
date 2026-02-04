@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request, status
 
 from fastapi_example.models.input import InputData
 from fastapi_example.workers import (
@@ -57,7 +57,13 @@ def divide(input_data: InputData, request: Request) -> dict:
     user_info = request.state.user_info
     user = user_info.get("sub")
     logger.debug(f"User {user} requesting divide operation")
-    result = divide_numbers(input_data.A, input_data.B)
+    try:
+        result = divide_numbers(input_data.A, input_data.B)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e),
+        ) from e
     return {
         "operation": "divide",
         "a": input_data.A,

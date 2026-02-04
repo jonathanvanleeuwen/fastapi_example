@@ -6,12 +6,12 @@ This module provides dependencies that can be applied at the router level.
 import logging
 from typing import Any
 
-from fastapi import HTTPException, Request, Security, status
+from fastapi import Depends, HTTPException, Request, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from fastapi_example.auth.api_key_auth import get_bearer_dependency
+from fastapi_example.auth.api_key_auth import auth_admin, auth_user
 from fastapi_example.auth.oauth_auth import get_current_oauth_user
-from fastapi_example.settings import get_settings
+from fastapi_example.settings import Settings, get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +21,7 @@ bearer_scheme = HTTPBearer(auto_error=False)
 async def authenticate_request(
     request: Request,
     credentials: HTTPAuthorizationCredentials = Security(bearer_scheme),  # noqa: B008
+    settings: Settings = Depends(get_settings),  # noqa: B008
 ) -> dict[str, Any]:
     """
     Unified authentication that tries OAuth first, then falls back to API key.
@@ -33,7 +34,6 @@ async def authenticate_request(
         )
 
     token = credentials.credentials
-    settings = get_settings()
 
     # Try OAuth JWT token first
     try:
@@ -111,8 +111,6 @@ async def require_role(required_roles: list[str] | None = None):
 
 
 # Pre-configured dependencies for common use cases
-api_key_admin = get_bearer_dependency(get_settings().api_keys, allowed_roles=["admin"])
-api_key_user = get_bearer_dependency(
-    get_settings().api_keys, allowed_roles=["admin", "user"]
-)
+api_key_admin = auth_admin
+api_key_user = auth_user
 oauth_required = get_current_oauth_user

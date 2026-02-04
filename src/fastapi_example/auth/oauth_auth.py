@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import jwt
@@ -89,7 +89,7 @@ def create_access_token(
     settings = get_settings()
     to_encode = data.copy()
 
-    expire = datetime.now(timezone.UTC) + (
+    expire = datetime.now(UTC) + (
         expires_delta or timedelta(minutes=settings.oauth_access_token_expire_minutes)
     )
     to_encode.update({"exp": expire})
