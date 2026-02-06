@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OAuth Login Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        button {
+            background: #24292e;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #1a1e22;
+        }
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            font-size: 16px;
+            margin-bottom: 10px;
+            background: white;
+            cursor: pointer;
+        }
+        .info {
+            background: #f6f8fa;
+            border: 1px solid #e1e4e8;
+            padding: 16px;
+            border-radius: 6px;
+            margin-top: 20px;
+            display: none;
+        }
+        .info.show {
+            display: block;
+        }
+        .info h3 {
+            margin-top: 0;
+            color: #24292e;
+        }
+        .info pre {
+            background: #fff;
+            padding: 12px;
+            border-radius: 4px;
+            overflow-x: auto;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+        }
+        .error {
+            color: #d73a49;
+            background: #ffeef0;
+            border: 1px solid #d73a49;
+            padding: 12px;
+            border-radius: 6px;
+            margin-top: 10px;
+            display: none;
+        }
+        .error.show {
+            display: block;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 10px;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+        }
+        .test-section {
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 2px solid #e1e4e8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 OAuth Login Test</h1>
+        
+        <button id="loginBtn" onclick="startOAuthFlow()">Loading...</button>
+        
+        <div id="error" class="error"></div>
+        
+        <div id="tokenInfo" class="info">
+            <h3>Access Token</h3>
+            <pre id="tokenDisplay"></pre>
+        </div>
+
+        <div class="test-section">
+            <h3>Test Protected Endpoint</h3>
+            <select id="operation">
+                <option value="add">Add (+)</option>
+                <option value="subtract">Subtract (-)</option>
+                <option value="multiply">Multiply (×)</option>
+                <option value="divide">Divide (÷)</option>
+            </select>
+            <input type="number" id="numA" placeholder="Number A" value="10">
+            <input type="number" id="numB" placeholder="Number B" value="5">
+            <button onclick="testMathEndpoint()">Test Math API</button>
+            
+            <div id="mathResult" class="info">
+                <h3>API Response</h3>
+                <pre id="mathDisplay"></pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8000';
+        const REDIRECT_URI = 'http://localhost:8000/static/callback.html';
+        
+        let accessToken = null;
+        let oauthProvider = 'OAuth';
+
+        // Fetch OAuth provider on page load
+        async function fetchProviderInfo() {
+            try {
+                const response = await fetch(`${API_URL}/auth/oauth/provider`);
+                if (response.ok) {
+                    const data = await response.json();
+                    oauthProvider = data.provider.charAt(0).toUpperCase() + data.provider.slice(1);
+                    document.getElementById('loginBtn').textContent = `Login with ${oauthProvider}`;
+                }
+            } catch (error) {
+                console.error('Failed to fetch provider info:', error);
+                document.getElementById('loginBtn').textContent = 'Login with OAuth';
+            }
+        }
+
+        // Initialize on page load
+        window.addEventListener('DOMContentLoaded', fetchProviderInfo);
+
+        async function startOAuthFlow() {
+            try {
+                const response = await fetch(`${API_URL}/auth/oauth/authorize`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        redirect_uri: REDIRECT_URI
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                window.location.href = data.authorization_url;
+            } catch (error) {
+                showError('Failed to start OAuth flow: ' + error.message);
+            }
+        }
+
+        async function exchangeCodeForToken(code) {
+            try {
+                const response = await fetch(`${API_URL}/auth/oauth/token`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        code: code,
+                        redirect_uri: REDIRECT_URI
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                accessToken = data.access_token;
+                
+                document.getElementById('tokenDisplay').textContent = accessToken;
+                document.getElementById('tokenInfo').classList.add('show');
+                
+                localStorage.setItem('access_token', accessToken);
+            } catch (error) {
+                showError('Failed to exchange code: ' + error.message);
+            }
+        }
+
+        async function testMathEndpoint() {
+            const token = accessToken || localStorage.getItem('access_token');
+            
+            if (!token) {
+                showError('Please login first');
+                return;
+            }
+
+            const operation = document.getElementById('operation').value;
+            const numA = parseFloat(document.getElementById('numA').value);
+            const numB = parseFloat(document.getElementById('numB').value);
+
+            try {
+                const response = await fetch(`${API_URL}/math/${operation}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        A: numA,
+                        B: numB
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                document.getElementById('mathDisplay').textContent = JSON.stringify(data, null, 2);
+                document.getElementById('mathResult').classList.add('show');
+                hideError();
+            } catch (error) {
+                showError('API call failed: ' + error.message);
+            }
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.classList.add('show');
+        }
+
+        function hideError() {
+            document.getElementById('error').classList.remove('show');
+        }
+
+        window.addEventListener('load', () => {
+            const params = new URLSearchParams(window.location.search);
+            const code = params.get('code');
+            
+            if (code) {
+                exchangeCodeForToken(code);
+                window.history.replaceState({}, document.title, window.location.pathname);
+            } else {
+                const savedToken = localStorage.getItem('access_token');
+                if (savedToken) {
+                    accessToken = savedToken;
+                    document.getElementById('tokenDisplay').textContent = savedToken;
+                    document.getElementById('tokenInfo').classList.add('show');
+                }
+            }
+        });
+    </script>
+</body>
+</html>

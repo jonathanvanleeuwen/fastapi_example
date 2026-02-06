@@ -12,10 +12,10 @@ from fastapi_example.workers import (
 
 logger = logging.getLogger(__name__)
 
-fastapi_router = APIRouter(tags=["fastapi_example"], prefix="/fastapi_example")
+math_router = APIRouter(tags=["math"], prefix="/math")
 
 
-@fastapi_router.post("/add", operation_id="add_numbers", status_code=200)
+@math_router.post("/add", status_code=200)
 def add(input_data: InputData, request: Request) -> dict:
     user_info = request.state.user_info
     user = user_info.get("sub")
@@ -24,7 +24,7 @@ def add(input_data: InputData, request: Request) -> dict:
     return {"operation": "add", "a": input_data.A, "b": input_data.B, "result": result}
 
 
-@fastapi_router.post("/subtract", operation_id="subtract_numbers", status_code=200)
+@math_router.post("/subtract", status_code=200)
 def subtract(input_data: InputData, request: Request) -> dict:
     user_info = request.state.user_info
     user = user_info.get("sub")
@@ -38,7 +38,7 @@ def subtract(input_data: InputData, request: Request) -> dict:
     }
 
 
-@fastapi_router.post("/multiply", operation_id="multiply_numbers", status_code=200)
+@math_router.post("/multiply", status_code=200)
 def multiply(input_data: InputData, request: Request) -> dict:
     user_info = request.state.user_info
     user = user_info.get("sub")
@@ -52,7 +52,7 @@ def multiply(input_data: InputData, request: Request) -> dict:
     }
 
 
-@fastapi_router.post("/divide", operation_id="divide_numbers", status_code=200)
+@math_router.post("/divide", status_code=200)
 def divide(input_data: InputData, request: Request) -> dict:
     user_info = request.state.user_info
     user = user_info.get("sub")

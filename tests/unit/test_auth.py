@@ -5,48 +5,33 @@ from fastapi import HTTPException
 
 from fastapi_example.auth.oauth_auth import (
     create_access_token,
-    create_oauth_provider,
+    get_oauth_config,
     verify_access_token,
 )
 
 
-def test_create_oauth_provider_google():
-    provider = create_oauth_provider("google")
-    assert provider.provider_name == "google"
-    assert "accounts.google.com" in provider.authorization_url
-    assert "oauth2.googleapis.com" in provider.token_url
-
-
-def test_create_oauth_provider_azure():
-    provider = create_oauth_provider("azure")
-    assert provider.provider_name == "azure"
-    assert "login.microsoftonline.com" in provider.authorization_url
-
-
-def test_create_oauth_provider_github():
-    provider = create_oauth_provider("github")
-    assert provider.provider_name == "github"
-    assert "github.com" in provider.authorization_url
-
-
-def test_create_oauth_provider_invalid():
-    with pytest.raises(ValueError, match="Unsupported OAuth provider"):
-        create_oauth_provider("invalid_provider")
+def test_get_oauth_config():
+    config = get_oauth_config()
+    assert "authorization_url" in config
+    assert "token_url" in config
+    assert "userinfo_url" in config
+    assert "scope" in config
+    assert "github.com" in config["authorization_url"]
 
 
 def test_create_access_token():
-    data = {"sub": "test@example.com", "provider": "google"}
+    data = {"sub": "test@example.com", "provider": "github"}
     token = create_access_token(data)
     assert isinstance(token, str)
     assert len(token) > 0
 
 
 def test_verify_access_token_success():
-    data = {"sub": "test@example.com", "provider": "google"}
+    data = {"sub": "test@example.com", "provider": "github"}
     token = create_access_token(data)
     payload = verify_access_token(token)
     assert payload["sub"] == "test@example.com"
-    assert payload["provider"] == "google"
+    assert payload["provider"] == "github"
 
 
 def test_verify_access_token_expired():

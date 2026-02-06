@@ -11,68 +11,30 @@ from fastapi_example.settings import get_settings
 logger = logging.getLogger(__name__)
 
 
-class OAuthProvider:
-    """Base class for OAuth providers with minimal configuration."""
-
-    def __init__(
-        self,
-        provider_name: str,
-        client_id: str,
-        client_secret: str,
-        authorization_url: str,
-        token_url: str,
-        userinfo_url: str,
-    ):
-        self.provider_name = provider_name
-        self.client_id = client_id
-        self.client_secret = client_secret
-        self.authorization_url = authorization_url
-        self.token_url = token_url
-        self.userinfo_url = userinfo_url
+OAUTH_PROVIDERS = {
+    "github": {
+        "authorization_url": "https://github.com/login/oauth/authorize",
+        "token_url": "https://github.com/login/oauth/access_token",
+        "userinfo_url": "https://api.github.com/user",
+        "scope": "user:email",
+    },
+    "google": {
+        "authorization_url": "https://accounts.google.com/o/oauth2/v2/auth",
+        "token_url": "https://oauth2.googleapis.com/token",
+        "userinfo_url": "https://www.googleapis.com/oauth2/v2/userinfo",
+        "scope": "openid email profile",
+    },
+}
 
 
-def create_oauth_provider(provider_type: str) -> OAuthProvider:
-    """
-    Factory function to create OAuth provider based on type.
-
-    Supported providers:
-    - google: Google OAuth
-    - azure: Microsoft Azure AD
-    - github: GitHub OAuth
-    """
+def get_oauth_config() -> dict[str, str]:
     settings = get_settings()
+    provider = settings.oauth_provider
 
-    providers_config = {
-        "google": {
-            "authorization_url": "https://accounts.google.com/o/oauth2/v2/auth",
-            "token_url": "https://oauth2.googleapis.com/token",
-            "userinfo_url": "https://www.googleapis.com/oauth2/v2/userinfo",
-        },
-        "azure": {
-            "authorization_url": f"https://login.microsoftonline.com/{settings.oauth_tenant_id}/oauth2/v2.0/authorize",
-            "token_url": f"https://login.microsoftonline.com/{settings.oauth_tenant_id}/oauth2/v2.0/token",
-            "userinfo_url": "https://graph.microsoft.com/v1.0/me",
-        },
-        "github": {
-            "authorization_url": "https://github.com/login/oauth/authorize",
-            "token_url": "https://github.com/login/oauth/access_token",
-            "userinfo_url": "https://api.github.com/user",
-        },
-    }
+    if provider not in OAUTH_PROVIDERS:
+        raise ValueError(f"Unsupported OAuth provider: {provider}")
 
-    if provider_type not in providers_config:
-        raise ValueError(f"Unsupported OAuth provider: {provider_type}")
-
-    config = providers_config[provider_type]
-
-    return OAuthProvider(
-        provider_name=provider_type,
-        client_id=settings.oauth_client_id,
-        client_secret=settings.oauth_client_secret,
-        authorization_url=config["authorization_url"],
-        token_url=config["token_url"],
-        userinfo_url=config["userinfo_url"],
-    )
+    return OAUTH_PROVIDERS[provider]
 
 
 oauth2_scheme = OAuth2AuthorizationCodeBearer(
@@ -81,11 +43,15 @@ oauth2_scheme = OAuth2AuthorizationCodeBearer(
     auto_error=False,
 )
 
+# Module-level singleton to satisfy B008 linter rule
+_depends_oauth2_scheme = Depends(oauth2_scheme)
+
 
 def create_access_token(
-    data: dict[str, Any], expires_delta: timedelta | None = None
+    data: dict[str, Any],
+    expires_delta: timedelta | None = None,
+    roles: list[str] | None = None,
 ) -> str:
-    """Create a JWT access token."""
     settings = get_settings()
     to_encode = data.copy()
 
@@ -94,11 +60,13 @@ def create_access_token(
     )
     to_encode.update({"exp": expire})
 
+    if roles:
+        to_encode["roles"] = roles
+
     return jwt.encode(to_encode, settings.oauth_secret_key, algorithm="HS256")
 
 
 def verify_access_token(token: str) -> dict[str, Any]:
-    """Verify and decode a JWT access token."""
     settings = get_settings()
     try:
         payload = jwt.decode(token, settings.oauth_secret_key, algorithms=["HS256"])
@@ -117,9 +85,8 @@ def verify_access_token(token: str) -> dict[str, Any]:
 
 async def get_current_oauth_user(
     request: Request,
-    token: str | None = Depends(oauth2_scheme),
+    token: str | None = _depends_oauth2_scheme,
 ) -> dict[str, Any]:
-    """Dependency to get current user from OAuth token."""
     if token is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -135,11 +102,11 @@ async def get_current_oauth_user(
             detail="Invalid token payload",
         )
 
-    # Standardized user info structure (compatible with API key)
     user_data = {
         "sub": user_email,
         "auth_type": "oauth",
         "provider": payload.get("provider", "unknown"),
+        "roles": payload.get("roles", []),
     }
 
     logger.info(f"Authenticated OAuth user: {user_email}")
