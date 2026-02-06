@@ -351,16 +351,11 @@
             const numB = parseFloat(document.getElementById('numB').value);
 
             try {
-                const response = await fetch(`${API_URL}/math/${operation}`, {
-                    method: 'POST',
+                const response = await fetch(`${API_URL}/math/${operation}?A=${numA}&B=${numB}`, {
+                    method: 'GET',
                     headers: {
-                        'Content-Type': 'application/json',
                         'Authorization': `Bearer ${authHeader}`
-                    },
-                    body: JSON.stringify({
-                        A: numA,
-                        B: numB
-                    })
+                    }
                 });
 
                 if (!response.ok) {

@@ -129,10 +129,8 @@ export FASTAPI_EXAMPLE_API_KEYS="<base64_output>"
 #### Usage Example
 
 ```bash
-curl -X POST "http://localhost:8000/math/add" \
-  -H "Authorization: Bearer your_api_key_here" \
-  -H "Content-Type: application/json" \
-  -d '{"A": 10, "B": 5}'
+curl "http://localhost:8000/math/add?A=10&B=5" \
+  -H "Authorization: Bearer your_api_key_here"
 ```
 
 Security flow:
@@ -219,10 +217,8 @@ curl -X POST "http://localhost:8000/auth/oauth/token" \
   }'
 
 # 4. Use the access token
-curl -X POST "http://localhost:8000/math/add" \
-  -H "Authorization: Bearer <access_token>" \
-  -H "Content-Type: application/json" \
-  -d '{"A": 10, "B": 5}'
+curl "http://localhost:8000/math/add?A=10&B=5" \
+  -H "Authorization: Bearer <access_token>"
 ```
 
 #### Role Assignment
@@ -323,17 +319,15 @@ fastapi_example/
 
 | Endpoint | Method | Description | Example |
 |----------|--------|-------------|---------|
-| `/math/add` | POST | Add two numbers | `{"A": 10, "B": 5}` → `{"result": 15}` |
-| `/math/subtract` | POST | Subtract B from A | `{"A": 10, "B": 5}` → `{"result": 5}` |
-| `/math/multiply` | POST | Multiply two numbers | `{"A": 7, "B": 6}` → `{"result": 42}` |
-| `/math/divide` | POST | Divide A by B | `{"A": 10, "B": 2}` → `{"result": 5}` |
+| `/math/add` | GET | Add two numbers | `?A=10&B=5` → `{"result": 15}` |
+| `/math/subtract` | GET | Subtract B from A | `?A=10&B=5` → `{"result": 5}` |
+| `/math/multiply` | GET | Multiply two numbers | `?A=7&B=6` → `{"result": 42}` |
+| `/math/divide` | GET | Divide A by B | `?A=10&B=2` → `{"result": 5}` |
 
 Example request:
 ```bash
-curl -X POST "http://localhost:8000/math/multiply" \
-  -H "Authorization: Bearer your_api_key" \
-  -H "Content-Type: application/json" \
-  -d '{"A": 7, "B": 6}'
+curl "http://localhost:8000/math/multiply?A=7&B=6" \
+  -H "Authorization: Bearer your_api_key"
 ```
 
 Response:
@@ -497,9 +491,9 @@ import requests
 
 url = "http://localhost:8000/math/add"
 headers = {"Authorization": "Bearer your_api_key"}
-data = {"A": 10, "B": 5}
+params = {"A": 10, "B": 5}
 
-response = requests.post(url, json=data, headers=headers)
+response = requests.get(url, params=params, headers=headers)
 print(response.json())
 # Output: {"operation": "add", "a": 10, "b": 5, "result": 15}
 ```
@@ -507,13 +501,11 @@ print(response.json())
 ### JavaScript fetch
 
 ```javascript
-const response = await fetch('http://localhost:8000/math/add', {
-  method: 'POST',
+const response = await fetch('http://localhost:8000/math/add?A=10&B=5', {
+  method: 'GET',
   headers: {
-    'Authorization': 'Bearer your_api_key',
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify({ A: 10, B: 5 })
+    'Authorization': 'Bearer your_api_key'
+  }
 });
 
 const data = await response.json();
@@ -525,19 +517,17 @@ console.log(data);
 
 Invalid authentication:
 ```bash
-curl -X POST "http://localhost:8000/math/add" \
-  -H "Authorization: Bearer invalid_key" \
-  -d '{"A": 10, "B": 5}'
+curl "http://localhost:8000/math/add?A=10&B=5" \
+  -H "Authorization: Bearer invalid_key"
 
-# Response: 307 Redirect to /auth/oauth/authorize
+# Response: 307 Redirect to /static/
 ```
 
 Insufficient permissions:
 ```bash
 # If user lacks required role
-curl -X POST "http://localhost:8000/math/add" \
-  -H "Authorization: Bearer user_without_role" \
-  -d '{"A": 10, "B": 5}'
+curl "http://localhost:8000/math/add?A=10&B=5" \
+  -H "Authorization: Bearer user_without_role"
 
 # Response: {"detail": "User does not have required role"}
 # Status: 403 Forbidden
@@ -545,11 +535,10 @@ curl -X POST "http://localhost:8000/math/add" \
 
 Invalid input:
 ```bash
-curl -X POST "http://localhost:8000/math/add" \
-  -H "Authorization: Bearer your_api_key" \
-  -d '{"A": "not_a_number", "B": 5}'
+curl "http://localhost:8000/math/add?A=not_a_number&B=5" \
+  -H "Authorization: Bearer your_api_key"
 
-# Response: {"detail": [{"type": "float_parsing", "loc": ["body", "A"], ...}]}
+# Response: {"detail": [{"type": "float_parsing", "loc": ["query", "A"], ...}]}
 # Status: 422 Unprocessable Entity
 ```
 

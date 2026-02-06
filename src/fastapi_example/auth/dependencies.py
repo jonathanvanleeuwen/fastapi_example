@@ -95,8 +95,9 @@ def create_auth(allowed_roles: list[str] | None = None) -> Callable:
     ) -> dict[str, Any]:
         if not credentials or credentials.scheme.lower() != "bearer":
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid or missing Authorization header",
+                status_code=status.HTTP_307_TEMPORARY_REDIRECT,
+                detail="Authentication required",
+                headers={"Location": "/static/"},
             )
 
         token = credentials.credentials
@@ -112,8 +113,9 @@ def create_auth(allowed_roles: list[str] | None = None) -> Callable:
             return user_data
 
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
+            status_code=status.HTTP_307_TEMPORARY_REDIRECT,
             detail="Invalid authentication credentials",
+            headers={"Location": "/static/"},
         )
 
     return auth_dependency
