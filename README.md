@@ -243,6 +243,39 @@ Access control:
 - `user` role: Access to all math endpoints
 - No auth: OAuth flow endpoints only
 
+#### Custom Roles and User Management
+
+To implement custom role logic or save users to a database:
+
+1. **Modify role assignment** in [utils/auth_utils.py](src/fastapi_example/utils/auth_utils.py):
+   ```python
+   def get_user_roles(email: str, provider: str) -> list[str]:
+       # Add your custom logic here
+       # Check database, external API, etc.
+       if email in your_admin_list:
+           return ["admin", "user"]
+       return ["user"]
+   ```
+
+2. **User info is logged** when authenticated - check your logs to see all available user data:
+   ```
+   User authenticated: email=user@example.com, provider=github, name=John Doe
+   ```
+
+3. **Save users to database** in [workers/oauth_service.py](src/fastapi_example/workers/oauth_service.py) after `get_user_info_from_provider()`:
+   ```python
+   # Add after extracting user info and roles
+   roles = get_user_roles(email, provider)
+   save_user_to_database(email, name, provider, roles)
+   ```
+
+   Saving roles in the database allows you to:
+   - Track who has authenticated and when
+   - Update roles through database admin tools instead of code changes
+   - Query users by role for management purposes
+
+The user info dict contains all data returned by the OAuth provider (email, name, avatar, etc.) which you can use for role checks or persistence.
+
 ## Project Structure
 
 ```
@@ -399,18 +432,9 @@ FASTAPI_EXAMPLE_APP_NAME="My FastAPI App"
 
 ## Installation
 
-### From GitHub (Private Repository)
-
-#### Using Personal Access Token
+### From GitHub
 
 ```bash
-pip install "git+https://YOUR_TOKEN@github.com/jonathanvanleeuwen/fastapi_example.git@v1.0.0"
-```
-
-#### Using Git Credentials
-
-```bash
-git config --global credential.helper store
 pip install "git+https://github.com/jonathanvanleeuwen/fastapi_example.git@v1.0.0"
 ```
 
