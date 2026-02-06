@@ -83,7 +83,7 @@ def _try_oauth_auth(
         raise HTTPException(
             status_code=status.HTTP_307_TEMPORARY_REDIRECT,
             detail="OAuth authentication failed",
-            headers={"Location": "/auth/oauth/authorize"},
+            headers={"Location": "/static/"},
         ) from None
 
 
