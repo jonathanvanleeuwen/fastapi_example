@@ -22,7 +22,9 @@ class Settings(BaseSettings):
     oauth_secret_key: str = "your-secret-key-min-32-chars-change-in-production"
     oauth_client_id: str = ""
     oauth_client_secret: str = ""
-    oauth_access_token_expire_minutes: int = 30
+    oauth_access_token_expire_minutes: int = (
+        1440  # Set to 1 day by default (1440 minutes)
+    )
 
     @model_validator(mode="after")
     def process_api_keys(self) -> "Settings":
