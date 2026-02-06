@@ -7,7 +7,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from fastapi_example.auth.oauth_auth import verify_access_token
 from fastapi_example.settings import Settings, get_settings
-from fastapi_example.utils import hash_api_key
+from fastapi_example.utils.auth_utils import hash_api_key
 
 logger = logging.getLogger(__name__)
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -107,7 +107,3 @@ def create_auth(allowed_roles: list[str] | None = None) -> Callable:
         )
 
     return auth_dependency
-
-
-def get_current_user(request: Request) -> dict[str, Any] | None:
-    return getattr(request.state, "user_info", None)

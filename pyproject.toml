@@ -93,6 +93,7 @@ lint.ignore = [
     "D102",
     "D107",
     "C901",  # function too complex
+    "ARG001",  # unused function argument
 ]
 
 [tool.semantic_release]

@@ -3,7 +3,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Request, status
 
 from fastapi_example.models.input import InputData
-from fastapi_example.workers import (
+from fastapi_example.workers.math_operations import (
     add_numbers,
     divide_numbers,
     multiply_numbers,
@@ -19,7 +19,7 @@ math_router = APIRouter(tags=["math"], prefix="/math")
 def add(input_data: InputData, request: Request) -> dict:
     user_info = request.state.user_info
     user = user_info.get("sub")
-    logger.debug(f"User {user} requesting add operation")
+    logger.debug("User %s requesting add operation", user)
     result = add_numbers(input_data.A, input_data.B)
     return {"operation": "add", "a": input_data.A, "b": input_data.B, "result": result}
 
@@ -28,7 +28,7 @@ def add(input_data: InputData, request: Request) -> dict:
 def subtract(input_data: InputData, request: Request) -> dict:
     user_info = request.state.user_info
     user = user_info.get("sub")
-    logger.debug(f"User {user} requesting subtract operation")
+    logger.debug("User %s requesting subtract operation", user)
     result = subtract_numbers(input_data.A, input_data.B)
     return {
         "operation": "subtract",
@@ -42,7 +42,7 @@ def subtract(input_data: InputData, request: Request) -> dict:
 def multiply(input_data: InputData, request: Request) -> dict:
     user_info = request.state.user_info
     user = user_info.get("sub")
-    logger.debug(f"User {user} requesting multiply operation")
+    logger.debug("User %s requesting multiply operation", user)
     result = multiply_numbers(input_data.A, input_data.B)
     return {
         "operation": "multiply",
@@ -56,7 +56,7 @@ def multiply(input_data: InputData, request: Request) -> dict:
 def divide(input_data: InputData, request: Request) -> dict:
     user_info = request.state.user_info
     user = user_info.get("sub")
-    logger.debug(f"User {user} requesting divide operation")
+    logger.debug("User %s requesting divide operation", user)
     try:
         result = divide_numbers(input_data.A, input_data.B)
     except ValueError as e:

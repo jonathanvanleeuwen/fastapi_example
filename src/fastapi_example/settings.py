@@ -5,7 +5,7 @@ from functools import lru_cache
 from pydantic import model_validator
 from pydantic_settings import BaseSettings
 
-from fastapi_example.utils import hash_api_key
+from fastapi_example.utils.auth_utils import hash_api_key
 
 
 class Settings(BaseSettings):

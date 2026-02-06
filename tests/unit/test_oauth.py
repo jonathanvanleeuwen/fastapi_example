@@ -22,10 +22,10 @@ def test_exchange_code_for_token_success(client, monkeypatch):
     mock_user_response.json.return_value = {"email": "test@example.com"}
     mock_user_response.raise_for_status = MagicMock()
 
-    async def mock_post(*args, **kwargs):
+    async def mock_post(*_args, **_kwargs):
         return mock_token_response
 
-    async def mock_get(*args, **kwargs):
+    async def mock_get(*_args, **_kwargs):
         return mock_user_response
 
     class MockAsyncClient:
@@ -38,7 +38,7 @@ def test_exchange_code_for_token_success(client, monkeypatch):
         post = mock_post
         get = mock_get
 
-    monkeypatch.setattr(httpx, "AsyncClient", lambda: MockAsyncClient())
+    monkeypatch.setattr(httpx, "AsyncClient", MockAsyncClient)
 
     request_data = {
         "code": "test_code",
