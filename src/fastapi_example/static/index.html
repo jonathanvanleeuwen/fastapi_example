@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OAuth Login Test</title>
+    <title>API Authentication Test</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -111,19 +111,62 @@
             padding-top: 30px;
             border-top: 2px solid #e1e4e8;
         }
+        .auth-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .auth-tab {
+            flex: 1;
+            padding: 10px;
+            background: #f6f8fa;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            cursor: pointer;
+            text-align: center;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        .auth-tab:hover {
+            background: #e1e4e8;
+        }
+        .auth-tab.active {
+            background: #24292e;
+            color: white;
+            border-color: #24292e;
+        }
+        .auth-section {
+            display: none;
+        }
+        .auth-section.active {
+            display: block;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🔐 OAuth Login Test</h1>
+        <h1>🔐 API Authentication Test</h1>
 
-        <button id="loginBtn" onclick="startOAuthFlow()">Loading...</button>
-        <button id="logoutBtn" class="logout hidden" onclick="logout()">Logout</button>
+        <div class="auth-tabs">
+            <div class="auth-tab active" onclick="switchAuthTab('oauth')">OAuth Login</div>
+            <div class="auth-tab" onclick="switchAuthTab('apikey')">API Key</div>
+        </div>
+
+        <div id="oauthSection" class="auth-section active">
+            <button id="loginBtn" onclick="startOAuthFlow()">Loading...</button>
+            <button id="logoutBtn" class="logout hidden" onclick="logout()">Logout</button>
+        </div>
+
+        <div id="apikeySection" class="auth-section">
+            <input type="text" id="apiKeyInput" placeholder="Enter your API key" />
+            <button onclick="setApiKey()">Set API Key</button>
+            <button id="clearApiKeyBtn" class="logout hidden" onclick="clearApiKey()">Clear API Key</button>
+        </div>
 
         <div id="error" class="error"></div>
 
         <div id="tokenInfo" class="info">
-            <h3>Access Token</h3>
+            <h3>Authentication Info</h3>
             <pre id="tokenDisplay"></pre>
         </div>
 
@@ -151,9 +194,60 @@
         const REDIRECT_URI = 'http://localhost:8000/static/callback.html';
 
         let accessToken = null;
+        let apiKey = null;
+        let authType = null; // 'oauth' or 'apikey'
         let oauthProvider = 'OAuth';
 
-        // Fetch OAuth provider on page load
+        function switchAuthTab(tab) {
+            // Update tab styling
+            document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // Show/hide auth sections
+            document.getElementById('oauthSection').classList.toggle('active', tab === 'oauth');
+            document.getElementById('apikeySection').classList.toggle('active', tab === 'apikey');
+
+            hideError();
+        }
+
+        function setApiKey() {
+            const key = document.getElementById('apiKeyInput').value.trim();
+
+            if (!key) {
+                showError('Please enter an API key');
+                return;
+            }
+
+            apiKey = key;
+            authType = 'apikey';
+            accessToken = null;
+
+            localStorage.setItem('api_key', apiKey);
+            localStorage.setItem('auth_type', 'apikey');
+            localStorage.removeItem('access_token');
+
+            document.getElementById('tokenDisplay').textContent = `API Key: ${apiKey.substring(0, 10)}...`;
+            document.getElementById('tokenInfo').classList.add('show');
+            document.getElementById('clearApiKeyBtn').classList.remove('hidden');
+
+            hideError();
+        }
+
+        function clearApiKey() {
+            apiKey = null;
+            authType = null;
+
+            localStorage.removeItem('api_key');
+            localStorage.removeItem('auth_type');
+
+            document.getElementById('apiKeyInput').value = '';
+            document.getElementById('tokenInfo').classList.remove('show');
+            document.getElementById('clearApiKeyBtn').classList.add('hidden');
+            document.getElementById('mathResult').classList.remove('show');
+
+            hideError();
+        }
+
         async function fetchProviderInfo() {
             try {
                 const response = await fetch(`${API_URL}/auth/oauth/provider`);
@@ -225,11 +319,15 @@
 
                 const data = await response.json();
                 accessToken = data.access_token;
+                authType = 'oauth';
+                apiKey = null;
 
-                document.getElementById('tokenDisplay').textContent = accessToken;
+                document.getElementById('tokenDisplay').textContent = `OAuth Token: ${accessToken.substring(0, 50)}...`;
                 document.getElementById('tokenInfo').classList.add('show');
 
                 localStorage.setItem('access_token', accessToken);
+                localStorage.setItem('auth_type', 'oauth');
+                localStorage.removeItem('api_key');
                 updateUIForLoggedIn();
                 hideError();
             } catch (error) {
@@ -239,12 +337,15 @@
 
         async function testMathEndpoint() {
             const token = accessToken || localStorage.getItem('access_token');
+            const key = apiKey || localStorage.getItem('api_key');
+            const savedAuthType = authType || localStorage.getItem('auth_type');
 
-            if (!token) {
-                showError('Please login first');
+            if (!token && !key) {
+                showError('Please login with OAuth or set an API key first');
                 return;
             }
 
+            const authHeader = savedAuthType === 'apikey' ? key : token;
             const operation = document.getElementById('operation').value;
             const numA = parseFloat(document.getElementById('numA').value);
             const numB = parseFloat(document.getElementById('numB').value);
@@ -254,7 +355,7 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
+                        'Authorization': `Bearer ${authHeader}`
                     },
                     body: JSON.stringify({
                         A: numA,
@@ -287,10 +388,11 @@
         }
 
         function logout() {
-            // Clear token from memory and localStorage
+            // Clear OAuth token from memory and localStorage
             accessToken = null;
+            authType = null;
             localStorage.removeItem('access_token');
-
+            localStorage.removeItem('auth_type');
             // Hide token info and test results
             document.getElementById('tokenInfo').classList.remove('show');
             document.getElementById('mathResult').classList.remove('show');
@@ -330,12 +432,35 @@
                 // Exchange the code for a token (single use only)
                 exchangeCodeForToken(code);
             } else {
-                const savedToken = localStorage.getItem('access_token');
-                if (savedToken) {
-                    accessToken = savedToken;
-                    document.getElementById('tokenDisplay').textContent = savedToken;
-                    document.getElementById('tokenInfo').classList.add('show');
-                    updateUIForLoggedIn();
+                // Restore saved auth state
+                const savedAuthType = localStorage.getItem('auth_type');
+
+                if (savedAuthType === 'oauth') {
+                    const savedToken = localStorage.getItem('access_token');
+                    if (savedToken) {
+                        accessToken = savedToken;
+                        authType = 'oauth';
+                        document.getElementById('tokenDisplay').textContent = `OAuth Token: ${savedToken.substring(0, 50)}...`;
+                        document.getElementById('tokenInfo').classList.add('show');
+                        updateUIForLoggedIn();
+                    } else {
+                        updateUIForLoggedOut();
+                    }
+                } else if (savedAuthType === 'apikey') {
+                    const savedKey = localStorage.getItem('api_key');
+                    if (savedKey) {
+                        apiKey = savedKey;
+                        authType = 'apikey';
+                        document.getElementById('apiKeyInput').value = savedKey;
+                        document.getElementById('tokenDisplay').textContent = `API Key: ${savedKey.substring(0, 10)}...`;
+                        document.getElementById('tokenInfo').classList.add('show');
+                        document.getElementById('clearApiKeyBtn').classList.remove('hidden');
+                        // Switch to API key tab
+                        document.getElementById('oauthSection').classList.remove('active');
+                        document.getElementById('apikeySection').classList.add('active');
+                        document.querySelectorAll('.auth-tab')[0].classList.remove('active');
+                        document.querySelectorAll('.auth-tab')[1].classList.add('active');
+                    }
                 } else {
                     updateUIForLoggedOut();
                 }

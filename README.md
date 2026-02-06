@@ -1,6 +1,6 @@
 # FastAPI Example
 
-A production-ready FastAPI template with dual authentication (API Keys + OAuth), role-based access control, and comprehensive testing.
+A FastAPI template with dual authentication (API Keys + OAuth), role-based access control, and comprehensive testing.
 
 ## Table of Contents
 
@@ -22,7 +22,7 @@ A production-ready FastAPI template with dual authentication (API Keys + OAuth),
 - Worker pattern for clean separation between routes and business logic
 - Structured JSON logging with request tracking
 - Comprehensive unit test suite with coverage reporting
-- Built-in OAuth test frontend for testing authentication flows
+- Built-in authentication test frontend supporting both OAuth and API key flows
 
 **Developer Experience**
 
@@ -58,7 +58,7 @@ python dev_server.py
 
 ### Access Points
 
-- **OAuth Frontend**: http://localhost:8000 (main page)
+- **Authentication Frontend**: http://localhost:8000/static/ (test both OAuth and API key methods)
 - **API Documentation**: http://localhost:8000/docs
 - **Alternative Docs**: http://localhost:8000/redoc
 
@@ -193,10 +193,13 @@ export FASTAPI_EXAMPLE_OAUTH_PROVIDER="github"  # or "google"
 
 Web interface (recommended):
 1. Start server: `python dev_server.py`
-2. Visit: http://localhost:8000
-3. Click "Login with [Provider]" (button updates based on configured provider)
-4. Authorize the application
-5. Test protected endpoints with your token
+2. Visit: http://localhost:8000/static/
+3. Choose authentication method:
+   - **OAuth Login**: Click "Login with [Provider]" → authorize → automatic token handling
+   - **API Key**: Click "API Key" tab → enter your key → click "Set API Key"
+4. Test protected endpoints using the math operation form
+
+Both authentication methods provide access to the same endpoints. Your choice is persisted in the browser.
 
 Manual cURL flow:
 ```bash
@@ -260,8 +263,8 @@ fastapi_example/
 │   │   └── oauth.py                 # OAuth models
 │   ├── utils/
 │   │   └── auth_utils.py            # Hashing utilities
-│   ├── static/                      # OAuth test frontend
-│   │   ├── index.html               # Main test page
+│   ├── static/                      # Authentication test frontend
+│   │   ├── index.html               # Main test page (OAuth + API Key)
 │   │   └── callback.html            # OAuth callback handler
 │   ├── custom_logger/               # Logging configuration
 │   ├── main.py                      # FastAPI app entry point

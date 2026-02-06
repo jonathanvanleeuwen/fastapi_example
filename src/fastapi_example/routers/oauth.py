@@ -69,6 +69,7 @@ async def exchange_code_for_token(
         provider=settings.oauth_provider,
         provider_access_token=provider_access_token,
     )
+    logger.info("Retrieved user: %s", user_info)
 
     # Extract user email
     user_email = extract_user_email(user_info)
