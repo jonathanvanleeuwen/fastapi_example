@@ -9,6 +9,7 @@ from fastapi_example.models.oauth import (
     TokenResponse,
 )
 from fastapi_example.settings import Settings, get_settings
+from fastapi_example.utils.auth_utils import get_user_roles
 from fastapi_example.workers.oauth_service import (
     build_authorization_url,
     exchange_code_for_provider_token,
@@ -72,10 +73,13 @@ async def exchange_code_for_token(
     # Extract user email
     user_email = extract_user_email(user_info)
 
+    # Get user roles based on email or other criteria
+    user_roles = get_user_roles(user_email)
+
     # Create our internal access token
     access_token = create_access_token(
         data={"sub": user_email, "provider": settings.oauth_provider},
-        roles=["admin"],
+        roles=user_roles,
     )
 
     logger.info(

@@ -36,6 +36,21 @@
         button:hover {
             background: #1a1e22;
         }
+        button:disabled {
+            background: #6a737d;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        button.logout {
+            background: #d73a49;
+            margin-top: 10px;
+        }
+        button.logout:hover {
+            background: #cb2431;
+        }
+        .hidden {
+            display: none;
+        }
         select {
             width: 100%;
             padding: 12px;
@@ -101,11 +116,12 @@
 <body>
     <div class="container">
         <h1>🔐 OAuth Login Test</h1>
-        
+
         <button id="loginBtn" onclick="startOAuthFlow()">Loading...</button>
-        
+        <button id="logoutBtn" class="logout hidden" onclick="logout()">Logout</button>
+
         <div id="error" class="error"></div>
-        
+
         <div id="tokenInfo" class="info">
             <h3>Access Token</h3>
             <pre id="tokenDisplay"></pre>
@@ -122,7 +138,7 @@
             <input type="number" id="numA" placeholder="Number A" value="10">
             <input type="number" id="numB" placeholder="Number B" value="5">
             <button onclick="testMathEndpoint()">Test Math API</button>
-            
+
             <div id="mathResult" class="info">
                 <h3>API Response</h3>
                 <pre id="mathDisplay"></pre>
@@ -133,7 +149,7 @@
     <script>
         const API_URL = 'http://localhost:8000';
         const REDIRECT_URI = 'http://localhost:8000/static/callback.html';
-        
+
         let accessToken = null;
         let oauthProvider = 'OAuth';
 
@@ -157,6 +173,12 @@
 
         async function startOAuthFlow() {
             try {
+                // Show loading state
+                const loginBtn = document.getElementById('loginBtn');
+                const originalText = loginBtn.textContent;
+                loginBtn.textContent = 'Redirecting...';
+                loginBtn.disabled = true;
+
                 const response = await fetch(`${API_URL}/auth/oauth/authorize`, {
                     method: 'POST',
                     headers: {
@@ -172,8 +194,13 @@
                 }
 
                 const data = await response.json();
+                // Redirect to GitHub (or configured provider)
                 window.location.href = data.authorization_url;
             } catch (error) {
+                // Re-enable button on error
+                const loginBtn = document.getElementById('loginBtn');
+                loginBtn.disabled = false;
+                loginBtn.textContent = `Login with ${oauthProvider}`;
                 showError('Failed to start OAuth flow: ' + error.message);
             }
         }
@@ -192,16 +219,19 @@
                 });
 
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    const errorText = await response.text();
+                    throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
                 }
 
                 const data = await response.json();
                 accessToken = data.access_token;
-                
+
                 document.getElementById('tokenDisplay').textContent = accessToken;
                 document.getElementById('tokenInfo').classList.add('show');
-                
+
                 localStorage.setItem('access_token', accessToken);
+                updateUIForLoggedIn();
+                hideError();
             } catch (error) {
                 showError('Failed to exchange code: ' + error.message);
             }
@@ -209,7 +239,7 @@
 
         async function testMathEndpoint() {
             const token = accessToken || localStorage.getItem('access_token');
-            
+
             if (!token) {
                 showError('Please login first');
                 return;
@@ -256,19 +286,58 @@
             document.getElementById('error').classList.remove('show');
         }
 
+        function logout() {
+            // Clear token from memory and localStorage
+            accessToken = null;
+            localStorage.removeItem('access_token');
+
+            // Hide token info and test results
+            document.getElementById('tokenInfo').classList.remove('show');
+            document.getElementById('mathResult').classList.remove('show');
+
+            // Show login button, hide logout button
+            document.getElementById('loginBtn').classList.remove('hidden');
+            document.getElementById('logoutBtn').classList.add('hidden');
+
+            // Clear displays
+            document.getElementById('tokenDisplay').textContent = '';
+            document.getElementById('mathDisplay').textContent = '';
+
+            hideError();
+        }
+
+        function updateUIForLoggedIn() {
+            document.getElementById('loginBtn').classList.add('hidden');
+            document.getElementById('logoutBtn').classList.remove('hidden');
+        }
+
+        function updateUIForLoggedOut() {
+            const loginBtn = document.getElementById('loginBtn');
+            loginBtn.classList.remove('hidden');
+            loginBtn.disabled = false;
+            loginBtn.textContent = `Login with ${oauthProvider}`;
+            document.getElementById('logoutBtn').classList.add('hidden');
+        }
+
         window.addEventListener('load', () => {
             const params = new URLSearchParams(window.location.search);
             const code = params.get('code');
-            
+
             if (code) {
-                exchangeCodeForToken(code);
+                // Clear the code from URL immediately to prevent reuse
                 window.history.replaceState({}, document.title, window.location.pathname);
+
+                // Exchange the code for a token (single use only)
+                exchangeCodeForToken(code);
             } else {
                 const savedToken = localStorage.getItem('access_token');
                 if (savedToken) {
                     accessToken = savedToken;
                     document.getElementById('tokenDisplay').textContent = savedToken;
                     document.getElementById('tokenInfo').classList.add('show');
+                    updateUIForLoggedIn();
+                } else {
+                    updateUIForLoggedOut();
                 }
             }
         });

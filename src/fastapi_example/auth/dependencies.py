@@ -44,7 +44,12 @@ def _try_api_key_auth(
         "auth_type": "api_key",
         "roles": roles,
     }
-    logger.info("Authenticated via API key", extra={"user": username})
+    logger.info(
+        "Authenticated via API key, user: %s, roles: %s",
+        username,
+        roles,
+        extra={"user": username},
+    )
     return user_data
 
 
@@ -67,7 +72,12 @@ def _try_oauth_auth(
             "provider": payload.get("provider", "unknown"),
             "roles": oauth_roles,
         }
-        logger.info("Authenticated via OAuth", extra={"user": user_email})
+        logger.info(
+            "Authenticated via OAuth: %s, roles: %s",
+            user_email,
+            oauth_roles,
+            extra={"user": user_email},
+        )
         return user_data
     except HTTPException:
         raise HTTPException(

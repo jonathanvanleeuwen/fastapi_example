@@ -1,43 +1,37 @@
-# 🚀 FastAPI Example
+# FastAPI Example
 
-> A production-ready FastAPI template with dual authentication (API Keys + OAuth), role-based access control, and comprehensive testing.
+A production-ready FastAPI template with dual authentication (API Keys + OAuth), role-based access control, and comprehensive testing.
 
----
+## Table of Contents
 
-## 📋 Table of Contents
+- [Features](#features)
+- [Quick Start](#quick-start)
+- [Authentication](#authentication)
+- [Project Structure](#project-structure)
+- [API Endpoints](#api-endpoints)
+- [Development](#development)
+- [Installation](#installation)
+- [CI/CD](#cicd)
 
-- [✨ Features](#-features)
-- [⚡ Quick Start](#-quick-start)
-- [🔐 Authentication](#-authentication)
-- [🏗️ Project Structure](#️-project-structure)
-- [🌐 API Endpoints](#-api-endpoints)
-- [🛠️ Development](#️-development)
-- [📦 Installation](#-installation)
-- [🔄 CI/CD](#-cicd)
+## Features
 
----
+**Core Capabilities**
 
-## ✨ Features
+- Dual authentication system: API Keys (SHA256 hashed) and OAuth 2.0 (GitHub/Google)
+- Role-based access control with granular permissions
+- Worker pattern for clean separation between routes and business logic
+- Structured JSON logging with request tracking
+- Comprehensive unit test suite with coverage reporting
+- Built-in OAuth test frontend for testing authentication flows
 
-### Core Capabilities
+**Developer Experience**
 
-- 🔑 **Dual Authentication**: API Keys (SHA256 hashed) + OAuth 2.0 (GitHub/Google)
-- 👥 **Role-Based Access Control**: Fine-grained permissions with `admin` and `user` roles
-- 🎯 **Worker Pattern**: Clean separation between routes and business logic
-- 📝 **Structured Logging**: JSON logs with request tracking
-- 🧪 **100% Test Coverage**: Comprehensive unit and integration tests
-- 📱 **OAuth Test Frontend**: Built-in web UI for testing authentication flows
+- Modern Python development with `pyproject.toml` and Pydantic Settings
+- Automated CI/CD using GitHub Actions with semantic versioning
+- Code quality enforcement via pre-commit hooks (ruff, isort)
+- Automatic HTML coverage reports
 
-### Developer Experience
-
-- ⚙️ **Modern Python**: Using `pyproject.toml` and Pydantic Settings
-- 🔄 **Automated CI/CD**: GitHub Actions with semantic versioning
-- 🎨 **Code Quality**: Pre-commit hooks with ruff, isort, and more
-- 📊 **Coverage Reports**: Automatic HTML coverage generation
-
----
-
-## ⚡ Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -62,23 +56,21 @@ pip install -e ".[dev]"
 python dev_server.py
 ```
 
-### 🎯 Access Points
+### Access Points
 
-- **🌐 OAuth Frontend**: http://localhost:8000 (main page)
-- **📚 API Documentation**: http://localhost:8000/docs
-- **🔍 Alternative Docs**: http://localhost:8000/redoc
+- **OAuth Frontend**: http://localhost:8000 (main page)
+- **API Documentation**: http://localhost:8000/docs
+- **Alternative Docs**: http://localhost:8000/redoc
 
----
+## Authentication
 
-## 🔐 Authentication
+### API Key Authentication
 
-### 🔑 API Key Authentication
-
-API keys are hashed with **SHA256** for security and stored with user metadata.
+API keys are hashed with SHA256 for security and stored with user metadata.
 
 #### Configuration
 
-**Base64-encoded JSON format:**
+Base64-encoded JSON format:
 ```json
 {
   "your_api_key_here": {
@@ -92,7 +84,40 @@ API keys are hashed with **SHA256** for security and stored with user metadata.
 }
 ```
 
-**Setup via Environment Variable:**
+**Option 1: Using the secrets_b64.py helper script**
+
+1. Create a `secrets.json` file in `src/fastapi_example/auth/`:
+```json
+{
+  "my_secret_key_123": {
+    "username": "John Doe",
+    "roles": ["admin", "user"]
+  },
+  "another_key_456": {
+    "username": "Jane Smith",
+    "roles": ["user"]
+  }
+}
+```
+
+2. Encode the file to base64:
+```bash
+python src/fastapi_example/auth/secrets_b64.py encode
+```
+
+3. Set the environment variable:
+```bash
+# Copy the output from step 2
+export FASTAPI_EXAMPLE_API_KEYS="<base64_output_from_encode>"
+```
+
+4. To verify/decode:
+```bash
+python src/fastapi_example/auth/secrets_b64.py decode "<base64_string>"
+```
+
+**Option 2: Manual one-liner**
+
 ```bash
 # Generate base64-encoded keys
 python -c "import base64, json; print(base64.b64encode(json.dumps({'my_key': {'username': 'admin', 'roles': ['admin', 'user']}}).encode()).decode())"
@@ -110,17 +135,15 @@ curl -X POST "http://localhost:8000/math/add" \
   -d '{"A": 10, "B": 5}'
 ```
 
-**Security Flow:**
+Security flow:
 1. Incoming API key is hashed with SHA256
 2. Hash is compared against stored hashes
 3. User roles are validated against endpoint requirements
 4. Access granted if roles match
 
----
+### OAuth 2.0 Authentication
 
-### 🌐 OAuth 2.0 Authentication
-
-Supports **GitHub** (default) and **Google** OAuth providers with JWT tokens.
+Supports GitHub (default) and Google OAuth providers with JWT tokens.
 
 #### Provider Setup
 
@@ -129,8 +152,11 @@ Supports **GitHub** (default) and **Google** OAuth providers with JWT tokens.
 
 1. Go to [GitHub Settings → Developer Settings](https://github.com/settings/developers)
 2. Click **OAuth Apps** → **New OAuth App**
-3. Fill in application details
-4. Set **Authorization callback URL**: `http://localhost:8000/static/callback.html`
+3. Fill in application details:
+   - **Application name**: Your app name (e.g., "FastAPI Example")
+   - **Homepage URL**: `http://localhost:8000`
+   - **Authorization callback URL**: `http://localhost:8000/static/callback.html`
+4. Click **Register application**
 5. Copy **Client ID** and generate **Client Secret**
 
 </details>
@@ -143,7 +169,10 @@ Supports **GitHub** (default) and **Google** OAuth providers with JWT tokens.
 3. Navigate to **APIs & Services** → **Credentials**
 4. Create **OAuth 2.0 Client ID**
 5. Configure OAuth consent screen
-6. Set authorized redirect URI: `http://localhost:8000/static/callback.html`
+6. Set application details:
+   - **Application type**: Web application
+   - **Authorized JavaScript origins**: `http://localhost:8000`
+   - **Authorized redirect URIs**: `http://localhost:8000/static/callback.html`
 7. Copy **Client ID** and **Client Secret**
 
 </details>
@@ -162,14 +191,14 @@ export FASTAPI_EXAMPLE_OAUTH_PROVIDER="github"  # or "google"
 
 #### Testing OAuth Flow
 
-**🎨 Web Interface (Recommended):**
+Web interface (recommended):
 1. Start server: `python dev_server.py`
 2. Visit: http://localhost:8000
-3. Click **"Login with [Provider]"** (button updates based on configured provider)
+3. Click "Login with [Provider]" (button updates based on configured provider)
 4. Authorize the application
 5. Test protected endpoints with your token
 
-**🔧 Manual cURL Flow:**
+Manual cURL flow:
 ```bash
 # 1. Get authorization URL
 curl -X POST "http://localhost:8000/auth/oauth/authorize" \
@@ -206,31 +235,31 @@ token = create_access_token(
 )
 ```
 
-**Access Control:**
-- 🔴 **`admin`**: Full access to all math endpoints
-- 🟢 **`user`**: Access to all math endpoints
-- ⚪ **No auth**: OAuth flow endpoints only
+Access control:
+- `admin` role: Full access to all math endpoints
+- `user` role: Access to all math endpoints
+- No auth: OAuth flow endpoints only
 
----
-
-## 🏗️ Project Structure
+## Project Structure
 
 ```
 fastapi_example/
 ├── src/fastapi_example/
 │   ├── auth/
 │   │   ├── dependencies.py          # Unified auth dependency factory
-│   │   └── oauth_auth.py            # OAuth token management
+│   │   ├── oauth_auth.py            # OAuth token management
+│   │   └── oauth_providers.py       # OAuth provider configurations
 │   ├── routers/
 │   │   ├── math.py                  # Math operations (protected)
 │   │   └── oauth.py                 # OAuth flow endpoints
 │   ├── workers/
-│   │   └── math_operations.py       # Business logic layer
+│   │   ├── math_operations.py       # Business logic layer
+│   │   └── oauth_service.py         # OAuth service layer
 │   ├── models/
 │   │   ├── input.py                 # Request/response models
 │   │   └── oauth.py                 # OAuth models
 │   ├── utils/
-│   │   └── auth_utils.py            # Hashing & user utilities
+│   │   └── auth_utils.py            # Hashing utilities
 │   ├── static/                      # OAuth test frontend
 │   │   ├── index.html               # Main test page
 │   │   └── callback.html            # OAuth callback handler
@@ -247,14 +276,12 @@ fastapi_example/
 
 | Pattern | Description |
 |---------|-------------|
-| **Worker Pattern** | Business logic separated from HTTP layer for testability |
-| **Unified Auth** | Single dependency factory supporting multiple auth methods |
-| **Security Utilities** | `hash_api_key()` for SHA256 hashing of API keys |
-| **Pydantic Models** | Automatic validation for all inputs and outputs |
+| Worker Pattern | Business logic separated from HTTP layer for testability |
+| Unified Auth | Single dependency factory supporting multiple auth methods |
+| Security Utilities | `hash_api_key()` for SHA256 hashing of API keys |
+| Pydantic Models | Automatic validation for all inputs and outputs |
 
----
-
-## 🌐 API Endpoints
+## API Endpoints
 
 ### Math Operations (Requires `admin` or `user` role)
 
@@ -265,7 +292,7 @@ fastapi_example/
 | `/math/multiply` | POST | Multiply two numbers | `{"A": 7, "B": 6}` → `{"result": 42}` |
 | `/math/divide` | POST | Divide A by B | `{"A": 10, "B": 2}` → `{"result": 5}` |
 
-**Example Request:**
+Example request:
 ```bash
 curl -X POST "http://localhost:8000/math/multiply" \
   -H "Authorization: Bearer your_api_key" \
@@ -273,7 +300,7 @@ curl -X POST "http://localhost:8000/math/multiply" \
   -d '{"A": 7, "B": 6}'
 ```
 
-**Response:**
+Response:
 ```json
 {
   "operation": "multiply",
@@ -291,9 +318,7 @@ curl -X POST "http://localhost:8000/math/multiply" \
 | `/auth/oauth/authorize` | POST | Get authorization URL for OAuth flow |
 | `/auth/oauth/token` | POST | Exchange authorization code for JWT token |
 
----
-
-## 🛠️ Development
+## Development
 
 ### Running Tests
 
@@ -313,7 +338,7 @@ pytest -v
 
 ### Adding New Features
 
-#### 1️⃣ Add Business Logic
+#### Step 1: Add Business Logic
 
 ```python
 # src/fastapi_example/workers/math_operations.py
@@ -322,20 +347,11 @@ def power_numbers(a: float, b: float) -> float:
     return a ** b
 ```
 
-#### 2️⃣ Export from Worker Module
-
-```python
-# src/fastapi_example/workers/__init__.py
-from fastapi_example.workers.math_operations import power_numbers
-
-__all__ = ["power_numbers", ...]
-```
-
-#### 3️⃣ Create Route
+#### Step 2: Create Route
 
 ```python
 # src/fastapi_example/routers/math.py
-from fastapi_example.workers import power_numbers
+from fastapi_example.workers.math_operations import power_numbers
 from fastapi_example.models.input import InputData
 
 @math_router.post("/power")
@@ -349,11 +365,11 @@ def power(input_data: InputData) -> dict:
     }
 ```
 
-#### 4️⃣ Add Tests
+#### Step 3: Add Tests
 
 ```python
 # tests/unit/test_workers.py
-from fastapi_example.workers import power_numbers
+from fastapi_example.workers.math_operations import power_numbers
 
 def test_power_numbers():
     assert power_numbers(2, 3) == 8
@@ -378,9 +394,7 @@ FASTAPI_EXAMPLE_OAUTH_SECRET_KEY="your-32-char-secret-key"
 FASTAPI_EXAMPLE_APP_NAME="My FastAPI App"
 ```
 
----
-
-## 📦 Installation
+## Installation
 
 ### From GitHub (Private Repository)
 
@@ -411,9 +425,7 @@ pip install -e ".[dev]"
 fastapi_example @ git+https://github.com/jonathanvanleeuwen/fastapi_example.git@v1.0.0
 ```
 
----
-
-## 🔄 CI/CD
+## CI/CD
 
 ### Pre-commit Hooks
 
@@ -428,12 +440,16 @@ pre-commit install
 pre-commit run --all-files
 ```
 
-**Configured Checks:**
-- ✅ Code formatting (ruff)
-- ✅ Import sorting (isort)
-- ✅ Trailing whitespace
-- ✅ YAML/JSON syntax
-- ✅ Large file detection
+Configured checks:
+- Code formatting (ruff)
+- Import sorting (isort)
+- Trailing whitespace removal
+- End-of-file fixer
+- YAML/JSON syntax validation
+- Case conflict detection
+- Merge conflict detection
+- Private key detection
+- Prevent commits to main branch
 
 ### Semantic Versioning
 
@@ -445,9 +461,7 @@ Automated releases based on commit messages:
 | `feat:` | Minor (1.0.0 → 1.1.0) | `feat: add power operation` |
 | `BREAKING CHANGE:` | Major (1.0.0 → 2.0.0) | `feat: redesign API`<br>`BREAKING CHANGE: removed old endpoints` |
 
----
-
-## 📚 Usage Examples
+## Usage Examples
 
 ### Python requests
 
@@ -482,7 +496,7 @@ console.log(data);
 
 ### Error Handling
 
-**Invalid Authentication:**
+Invalid authentication:
 ```bash
 curl -X POST "http://localhost:8000/math/add" \
   -H "Authorization: Bearer invalid_key" \
@@ -491,7 +505,7 @@ curl -X POST "http://localhost:8000/math/add" \
 # Response: 307 Redirect to /auth/oauth/authorize
 ```
 
-**Insufficient Permissions:**
+Insufficient permissions:
 ```bash
 # If user lacks required role
 curl -X POST "http://localhost:8000/math/add" \
@@ -502,7 +516,7 @@ curl -X POST "http://localhost:8000/math/add" \
 # Status: 403 Forbidden
 ```
 
-**Invalid Input:**
+Invalid input:
 ```bash
 curl -X POST "http://localhost:8000/math/add" \
   -H "Authorization: Bearer your_api_key" \
@@ -512,27 +526,19 @@ curl -X POST "http://localhost:8000/math/add" \
 # Status: 422 Unprocessable Entity
 ```
 
----
-
-## 📊 Coverage Report
+## Coverage Report
 
 <!-- Pytest Coverage Comment:Begin -->
 <!-- Pytest Coverage Comment:End -->
 
----
-
-## 📄 License
+## License
 
 This project is licensed under the terms specified in the [LICENSE](LICENSE) file.
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
-
----
-
-Made with ❤️ using FastAPI

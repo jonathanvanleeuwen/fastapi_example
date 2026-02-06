@@ -1,5 +1,3 @@
-"""OAuth provider configurations."""
-
 OAUTH_PROVIDERS = {
     "github": {
         "authorization_url": "https://github.com/login/oauth/authorize",

@@ -1,5 +1,3 @@
-"""OAuth service layer for handling OAuth operations."""
-
 import logging
 from typing import Any
 
@@ -138,7 +136,35 @@ async def get_user_info_from_provider(
                 headers={"Authorization": f"Bearer {provider_access_token}"},
             )
             user_response.raise_for_status()
-            return user_response.json()
+            user_info = user_response.json()
+
+            # GitHub-specific: if email is not in user info, fetch from /user/emails
+            if provider == "github" and not user_info.get("email"):
+                emails_response = await client.get(
+                    "https://api.github.com/user/emails",
+                    headers={"Authorization": f"Bearer {provider_access_token}"},
+                )
+                emails_response.raise_for_status()
+                emails = emails_response.json()
+
+                # Find the primary email or the first verified email
+                primary_email = next(
+                    (
+                        e["email"]
+                        for e in emails
+                        if e.get("primary") and e.get("verified")
+                    ),
+                    None,
+                )
+                if not primary_email:
+                    primary_email = next(
+                        (e["email"] for e in emails if e.get("verified")), None
+                    )
+
+                if primary_email:
+                    user_info["email"] = primary_email
+
+            return user_info
         except httpx.HTTPError as e:
             logger.error("Failed to get user info: %s", e)
             raise HTTPException(
