@@ -1,46 +1,47 @@
 import base64
 import json
-import logging
 from functools import lru_cache
-from typing import Literal
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings
 
+from fastapi_example.utils.auth_utils import hash_api_key
+
 
 class Settings(BaseSettings):
-    # App settings
     app_name: str = "fastapi_example"
     description: str = "fastapi_example api"
-    stage: Literal["test", "development", "production"] = "development"
 
-    # CORS
-    cors_allow_origins: tuple = ("*",)
+    cors_allow_origins: tuple = ("http://localhost:3000", "http://127.0.0.1:3000", "*")
 
-    # LLM API
-    model_name: str = "gemini-2.5-flash"
-    openai_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
-    openai_api_key: str
+    api_keys: dict[str, dict] | str = (
+        "eyJ0ZXN0Ijp7InVzZXJuYW1lIjoiSm9uYXRoYW4iLCJyb2xlcyI6WyJhZG1pbiIsInVzZXIiXX0sInRlc3QyIjp7InVzZXJuYW1lIjoiYm9iIiwicm9sZXMiOlsidXNlciJdfX0="
+    )
 
-    # Prompt templates
-    extraction_system_prompt: str = ""  # Set in load_system_prompt
+    oauth_provider: str = "github"
+    oauth_secret_key: str = "your-secret-key-min-32-chars-change-in-production"
+    oauth_client_id: str = ""
+    oauth_client_secret: str = ""
+    oauth_access_token_expire_minutes: int = (
+        1440  # Set to 1 day by default (1440 minutes)
+    )
 
-    # Authentication settings
-    api_keys: dict[str, str] | str = ""
-
-    # logging
-    app_log_level: int = logging.INFO  # 20: info, 10: debug
-
-    # Validate that all api key values are unique
     @model_validator(mode="after")
-    def ensure_unique_values(self) -> "Settings":
-        # base64 decode if string
+    def process_api_keys(self) -> "Settings":
         if isinstance(self.api_keys, str):
             decoded = base64.b64decode(self.api_keys).decode()
             self.api_keys = json.loads(decoded)
-        secrets = list(self.api_keys.keys())
-        if len(secrets) != len(set(secrets)):
+
+        api_key_list = list(self.api_keys.keys())
+        if len(api_key_list) != len(set(api_key_list)):
             raise ValueError("All Keys in 'api_keys' must be unique")
+
+        hashed_keys = {}
+        for key, value in self.api_keys.items():
+            hashed_key = hash_api_key(key)
+            hashed_keys[hashed_key] = value
+
+        self.api_keys = hashed_keys
         return self
 
     class Config:

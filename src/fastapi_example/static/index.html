@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Authentication Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        button {
+            background: #24292e;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #1a1e22;
+        }
+        button:disabled {
+            background: #6a737d;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        button.logout {
+            background: #d73a49;
+            margin-top: 10px;
+        }
+        button.logout:hover {
+            background: #cb2431;
+        }
+        .hidden {
+            display: none;
+        }
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            font-size: 16px;
+            margin-bottom: 10px;
+            background: white;
+            cursor: pointer;
+        }
+        .info {
+            background: #f6f8fa;
+            border: 1px solid #e1e4e8;
+            padding: 16px;
+            border-radius: 6px;
+            margin-top: 20px;
+            display: none;
+        }
+        .info.show {
+            display: block;
+        }
+        .info h3 {
+            margin-top: 0;
+            color: #24292e;
+        }
+        .info pre {
+            background: #fff;
+            padding: 12px;
+            border-radius: 4px;
+            overflow-x: auto;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+        }
+        .error {
+            color: #d73a49;
+            background: #ffeef0;
+            border: 1px solid #d73a49;
+            padding: 12px;
+            border-radius: 6px;
+            margin-top: 10px;
+            display: none;
+        }
+        .error.show {
+            display: block;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 10px;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+        }
+        .test-section {
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 2px solid #e1e4e8;
+        }
+        .auth-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .auth-tab {
+            flex: 1;
+            padding: 10px;
+            background: #f6f8fa;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            cursor: pointer;
+            text-align: center;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        .auth-tab:hover {
+            background: #e1e4e8;
+        }
+        .auth-tab.active {
+            background: #24292e;
+            color: white;
+            border-color: #24292e;
+        }
+        .auth-section {
+            display: none;
+        }
+        .auth-section.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 API Authentication Test</h1>
+
+        <div class="auth-tabs">
+            <div class="auth-tab active" onclick="switchAuthTab('oauth')">OAuth Login</div>
+            <div class="auth-tab" onclick="switchAuthTab('apikey')">API Key</div>
+        </div>
+
+        <div id="oauthSection" class="auth-section active">
+            <button id="loginBtn" onclick="startOAuthFlow()">Loading...</button>
+            <button id="logoutBtn" class="logout hidden" onclick="logout()">Logout</button>
+        </div>
+
+        <div id="apikeySection" class="auth-section">
+            <input type="text" id="apiKeyInput" placeholder="Enter your API key" />
+            <button onclick="setApiKey()">Set API Key</button>
+            <button id="clearApiKeyBtn" class="logout hidden" onclick="clearApiKey()">Clear API Key</button>
+        </div>
+
+        <div id="error" class="error"></div>
+
+        <div id="tokenInfo" class="info">
+            <h3>Authentication Info</h3>
+            <pre id="tokenDisplay"></pre>
+        </div>
+
+        <div class="test-section">
+            <h3>Test Protected Endpoint</h3>
+            <select id="operation">
+                <option value="add">Add (+)</option>
+                <option value="subtract">Subtract (-)</option>
+                <option value="multiply">Multiply (×)</option>
+                <option value="divide">Divide (÷)</option>
+            </select>
+            <input type="number" id="numA" placeholder="Number A" value="10">
+            <input type="number" id="numB" placeholder="Number B" value="5">
+            <button onclick="testMathEndpoint()">Test Math API</button>
+
+            <div id="mathResult" class="info">
+                <h3>API Response</h3>
+                <pre id="mathDisplay"></pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8000';
+        const REDIRECT_URI = 'http://localhost:8000/static/callback.html';
+
+        let accessToken = null;
+        let apiKey = null;
+        let authType = null; // 'oauth' or 'apikey'
+        let oauthProvider = 'OAuth';
+
+        function switchAuthTab(tab) {
+            // Update tab styling
+            document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // Show/hide auth sections
+            document.getElementById('oauthSection').classList.toggle('active', tab === 'oauth');
+            document.getElementById('apikeySection').classList.toggle('active', tab === 'apikey');
+
+            hideError();
+        }
+
+        function setApiKey() {
+            const key = document.getElementById('apiKeyInput').value.trim();
+
+            if (!key) {
+                showError('Please enter an API key');
+                return;
+            }
+
+            apiKey = key;
+            authType = 'apikey';
+            accessToken = null;
+
+            localStorage.setItem('api_key', apiKey);
+            localStorage.setItem('auth_type', 'apikey');
+            localStorage.removeItem('access_token');
+
+            document.getElementById('tokenDisplay').textContent = `API Key: ${apiKey.substring(0, 10)}...`;
+            document.getElementById('tokenInfo').classList.add('show');
+            document.getElementById('clearApiKeyBtn').classList.remove('hidden');
+
+            hideError();
+        }
+
+        function clearApiKey() {
+            apiKey = null;
+            authType = null;
+
+            localStorage.removeItem('api_key');
+            localStorage.removeItem('auth_type');
+
+            document.getElementById('apiKeyInput').value = '';
+            document.getElementById('tokenInfo').classList.remove('show');
+            document.getElementById('clearApiKeyBtn').classList.add('hidden');
+            document.getElementById('mathResult').classList.remove('show');
+
+            hideError();
+        }
+
+        async function fetchProviderInfo() {
+            try {
+                const response = await fetch(`${API_URL}/auth/oauth/provider`);
+                if (response.ok) {
+                    const data = await response.json();
+                    oauthProvider = data.provider.charAt(0).toUpperCase() + data.provider.slice(1);
+                    document.getElementById('loginBtn').textContent = `Login with ${oauthProvider}`;
+                }
+            } catch (error) {
+                console.error('Failed to fetch provider info:', error);
+                document.getElementById('loginBtn').textContent = 'Login with OAuth';
+            }
+        }
+
+        // Initialize on page load
+        window.addEventListener('DOMContentLoaded', fetchProviderInfo);
+
+        async function startOAuthFlow() {
+            try {
+                // Show loading state
+                const loginBtn = document.getElementById('loginBtn');
+                const originalText = loginBtn.textContent;
+                loginBtn.textContent = 'Redirecting...';
+                loginBtn.disabled = true;
+
+                const response = await fetch(`${API_URL}/auth/oauth/authorize`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        redirect_uri: REDIRECT_URI
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                // Redirect to GitHub (or configured provider)
+                window.location.href = data.authorization_url;
+            } catch (error) {
+                // Re-enable button on error
+                const loginBtn = document.getElementById('loginBtn');
+                loginBtn.disabled = false;
+                loginBtn.textContent = `Login with ${oauthProvider}`;
+                showError('Failed to start OAuth flow: ' + error.message);
+            }
+        }
+
+        async function exchangeCodeForToken(code) {
+            try {
+                const response = await fetch(`${API_URL}/auth/oauth/token`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        code: code,
+                        redirect_uri: REDIRECT_URI
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+                }
+
+                const data = await response.json();
+                accessToken = data.access_token;
+                authType = 'oauth';
+                apiKey = null;
+
+                document.getElementById('tokenDisplay').textContent = `OAuth Token: ${accessToken.substring(0, 50)}...`;
+                document.getElementById('tokenInfo').classList.add('show');
+
+                localStorage.setItem('access_token', accessToken);
+                localStorage.setItem('auth_type', 'oauth');
+                localStorage.removeItem('api_key');
+                updateUIForLoggedIn();
+                hideError();
+            } catch (error) {
+                showError('Failed to exchange code: ' + error.message);
+            }
+        }
+
+        async function testMathEndpoint() {
+            const token = accessToken || localStorage.getItem('access_token');
+            const key = apiKey || localStorage.getItem('api_key');
+            const savedAuthType = authType || localStorage.getItem('auth_type');
+
+            if (!token && !key) {
+                showError('Please login with OAuth or set an API key first');
+                return;
+            }
+
+            const authHeader = savedAuthType === 'apikey' ? key : token;
+            const operation = document.getElementById('operation').value;
+            const numA = parseFloat(document.getElementById('numA').value);
+            const numB = parseFloat(document.getElementById('numB').value);
+
+            try {
+                const response = await fetch(`${API_URL}/math/${operation}?A=${numA}&B=${numB}`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${authHeader}`
+                    }
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                document.getElementById('mathDisplay').textContent = JSON.stringify(data, null, 2);
+                document.getElementById('mathResult').classList.add('show');
+                hideError();
+            } catch (error) {
+                showError('API call failed: ' + error.message);
+            }
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.classList.add('show');
+        }
+
+        function hideError() {
+            document.getElementById('error').classList.remove('show');
+        }
+
+        function logout() {
+            // Clear OAuth token from memory and localStorage
+            accessToken = null;
+            authType = null;
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('auth_type');
+            // Hide token info and test results
+            document.getElementById('tokenInfo').classList.remove('show');
+            document.getElementById('mathResult').classList.remove('show');
+
+            // Show login button, hide logout button
+            document.getElementById('loginBtn').classList.remove('hidden');
+            document.getElementById('logoutBtn').classList.add('hidden');
+
+            // Clear displays
+            document.getElementById('tokenDisplay').textContent = '';
+            document.getElementById('mathDisplay').textContent = '';
+
+            hideError();
+        }
+
+        function updateUIForLoggedIn() {
+            document.getElementById('loginBtn').classList.add('hidden');
+            document.getElementById('logoutBtn').classList.remove('hidden');
+        }
+
+        function updateUIForLoggedOut() {
+            const loginBtn = document.getElementById('loginBtn');
+            loginBtn.classList.remove('hidden');
+            loginBtn.disabled = false;
+            loginBtn.textContent = `Login with ${oauthProvider}`;
+            document.getElementById('logoutBtn').classList.add('hidden');
+        }
+
+        window.addEventListener('load', () => {
+            const params = new URLSearchParams(window.location.search);
+            const code = params.get('code');
+
+            if (code) {
+                // Clear the code from URL immediately to prevent reuse
+                window.history.replaceState({}, document.title, window.location.pathname);
+
+                // Exchange the code for a token (single use only)
+                exchangeCodeForToken(code);
+            } else {
+                // Restore saved auth state
+                const savedAuthType = localStorage.getItem('auth_type');
+
+                if (savedAuthType === 'oauth') {
+                    const savedToken = localStorage.getItem('access_token');
+                    if (savedToken) {
+                        accessToken = savedToken;
+                        authType = 'oauth';
+                        document.getElementById('tokenDisplay').textContent = `OAuth Token: ${savedToken.substring(0, 50)}...`;
+                        document.getElementById('tokenInfo').classList.add('show');
+                        updateUIForLoggedIn();
+                    } else {
+                        updateUIForLoggedOut();
+                    }
+                } else if (savedAuthType === 'apikey') {
+                    const savedKey = localStorage.getItem('api_key');
+                    if (savedKey) {
+                        apiKey = savedKey;
+                        authType = 'apikey';
+                        document.getElementById('apiKeyInput').value = savedKey;
+                        document.getElementById('tokenDisplay').textContent = `API Key: ${savedKey.substring(0, 10)}...`;
+                        document.getElementById('tokenInfo').classList.add('show');
+                        document.getElementById('clearApiKeyBtn').classList.remove('hidden');
+                        // Switch to API key tab
+                        document.getElementById('oauthSection').classList.remove('active');
+                        document.getElementById('apikeySection').classList.add('active');
+                        document.querySelectorAll('.auth-tab')[0].classList.remove('active');
+                        document.querySelectorAll('.auth-tab')[1].classList.add('active');
+                    }
+                } else {
+                    updateUIForLoggedOut();
+                }
+            }
+        });
+    </script>
+</body>
+</html>

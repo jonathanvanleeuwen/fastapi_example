@@ -1,278 +1,560 @@
-# fastapi_example
-A Python library with modern CI/CD setup.
+# FastAPI Example
+
+A FastAPI template with dual authentication (API Keys + OAuth), role-based access control, and comprehensive testing.
+
+## Table of Contents
+
+- [Features](#features)
+- [Quick Start](#quick-start)
+- [Authentication](#authentication)
+- [Project Structure](#project-structure)
+- [API Endpoints](#api-endpoints)
+- [Development](#development)
+- [Installation](#installation)
+- [CI/CD](#cicd)
 
 ## Features
-* Automated testing on PR using GitHub Actions
-* Pre-commit hooks for code quality (ruff, isort, trailing whitespace, etc.)
-* Semantic release using GitHub Actions
-* Automatic code coverage report in README
-* Automatic wheel build and GitHub Release publishing
-* Modern Python packaging with pyproject.toml
 
-*Notes*
-Workflows trigger when a branch is merged into main!
-To install, please follow all the instructions in this readme.
-The workflows require a PAT set as secret (see further down for instructions)
-See the notes on how to create semantic releases at the bottom of the README.
+**Core Capabilities**
 
-If you followed all the steps, whenever a PR is merged into `main`, the workflows are triggered and should:
-* Run pre-commit checks (fail fast on code quality issues)
-* Ensure that tests pass (before merge)
-* Create a code coverage report and commit that to the bottom of the README
-* Create a semantic release (if you follow the semantic release pattern) and automatically update the version number of your code
-* Build a wheel and publish it as a GitHub Release asset
+- Dual authentication system: API Keys (SHA256 hashed) and OAuth 2.0 (GitHub/Google)
+- Role-based access control with granular permissions
+- Worker pattern for clean separation between routes and business logic
+- Structured JSON logging with request tracking
+- Comprehensive unit test suite with coverage reporting
+- Built-in authentication test frontend supporting both OAuth and API key flows
 
+**Developer Experience**
 
-# Installation
+- Modern Python development with `pyproject.toml` and Pydantic Settings
+- Automated CI/CD using GitHub Actions with semantic versioning
+- Code quality enforcement via pre-commit hooks (ruff, isort)
+- Automatic HTML coverage reports
 
-## Option 1: Install from Private GitHub Release (Recommended)
-Since this is a private repository, you need to authenticate with a GitHub Personal Access Token (PAT).
+## Quick Start
 
-### Configure git credentials (more secure, recommended)
-This method doesn't expose your token in command history:
+### Prerequisites
+
+- Python 3.12+
+- Git
+
+### Installation & Run
 
 ```bash
-# Store credentials in git (one-time setup)
-git config --global credential.helper store
-
-# Then install normally - git will prompt for credentials once
-pip install "git+https://github.com/jonathanvanleeuwen/fastapi_example.git@VERSION"
-# When prompted: username = your GitHub username, password = your PAT
-```
-
-### Step 1: Create a Personal Access Token (one-time setup)
-
-1. Go to [GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)](https://github.com/settings/tokens)
-2. Click **"Generate new token (classic)"**
-3. Give it a descriptive name (e.g., `fastapi_example-install`)
-4. Select the **`repo`** scope (required for private repositories)
-5. Click **"Generate token"**
-6. **Copy the token immediately** - you won't be able to see it again!
-
-### Step 2: Install the package
-
-```bash
-# Replace YOUR_TOKEN with your actual token and VERSION with the desired version (e.g., v1.0.0)
-pip install "git+https://YOUR_TOKEN@github.com/jonathanvanleeuwen/fastapi_example.git@VERSION"
-
-# Install the latest version (main branch):
-pip install "git+https://YOUR_TOKEN@github.com/jonathanvanleeuwen/fastapi_example.git"
-```
-
-### Using uv (faster alternative to pip)
-
-```bash
-uv pip install "git+https://YOUR_TOKEN@github.com/jonathanvanleeuwen/fastapi_example.git@v1.0.0"
-```
-
-## Option 2: Install from Wheel File in Repository
-
-The latest wheel files are also committed to the `dist/` directory in the repository. After cloning:
-
-```bash
-# Clone the repository first
-git clone https://github.com/jonathanvanleeuwen/fastapi_example.git
-
-# Install the wheel file directly
-pip install fastapi_example/dist/fastapi_example-1.0.0-py3-none-any.whl
-```
-
-> **Note:** Replace the version number with the actual version in the `dist/` directory.
-
-## Option 3: Install from Source (Clone Repository)
-
-```bash
-# Clone the repository
+# Clone repository
 git clone https://github.com/jonathanvanleeuwen/fastapi_example.git
 cd fastapi_example
 
-# Install using pip
-pip install .
+# Create virtual environment
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
-# Or install in editable/development mode with dev dependencies
+# Install dependencies
+pip install -e ".[dev]"
+
+# Run the server
+python dev_server.py
+```
+
+### Access Points
+
+- **Authentication Frontend**: http://localhost:8000/static/ (test both OAuth and API key methods)
+- **API Documentation**: http://localhost:8000/docs
+- **Alternative Docs**: http://localhost:8000/redoc
+
+## Authentication
+
+### API Key Authentication
+
+API keys are hashed with SHA256 for security and stored with user metadata.
+
+#### Configuration
+
+Base64-encoded JSON format:
+```json
+{
+  "your_api_key_here": {
+    "username": "John Doe",
+    "roles": ["admin", "user"]
+  },
+  "another_key": {
+    "username": "Jane Smith",
+    "roles": ["user"]
+  }
+}
+```
+
+**Option 1: Using the secrets_b64.py helper script**
+
+1. Create a `secrets.json` file in `src/fastapi_example/auth/`:
+```json
+{
+  "my_secret_key_123": {
+    "username": "John Doe",
+    "roles": ["admin", "user"]
+  },
+  "another_key_456": {
+    "username": "Jane Smith",
+    "roles": ["user"]
+  }
+}
+```
+
+2. Encode the file to base64:
+```bash
+python src/fastapi_example/auth/secrets_b64.py encode
+```
+
+3. Set the environment variable:
+```bash
+# Copy the output from step 2
+export FASTAPI_EXAMPLE_API_KEYS="<base64_output_from_encode>"
+```
+
+4. To verify/decode:
+```bash
+python src/fastapi_example/auth/secrets_b64.py decode "<base64_string>"
+```
+
+**Option 2: Manual one-liner**
+
+```bash
+# Generate base64-encoded keys
+python -c "import base64, json; print(base64.b64encode(json.dumps({'my_key': {'username': 'admin', 'roles': ['admin', 'user']}}).encode()).decode())"
+
+# Set environment variable
+export FASTAPI_EXAMPLE_API_KEYS="<base64_output>"
+```
+
+#### Usage Example
+
+```bash
+curl "http://localhost:8000/math/add?A=10&B=5" \
+  -H "Authorization: Bearer your_api_key_here"
+```
+
+Security flow:
+1. Incoming API key is hashed with SHA256
+2. Hash is compared against stored hashes
+3. User roles are validated against endpoint requirements
+4. Access granted if roles match
+
+### OAuth 2.0 Authentication
+
+Supports GitHub (default) and Google OAuth providers with JWT tokens.
+
+#### Provider Setup
+
+<details>
+<summary><b>GitHub OAuth (Default)</b></summary>
+
+1. Go to [GitHub Settings → Developer Settings](https://github.com/settings/developers)
+2. Click **OAuth Apps** → **New OAuth App**
+3. Fill in application details:
+   - **Application name**: Your app name (e.g., "FastAPI Example")
+   - **Homepage URL**: `http://localhost:8000`
+   - **Authorization callback URL**: `http://localhost:8000/static/callback.html`
+4. Click **Register application**
+5. Copy **Client ID** and generate **Client Secret**
+
+</details>
+
+<details>
+<summary><b>Google OAuth</b></summary>
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project
+3. Navigate to **APIs & Services** → **Credentials**
+4. Create **OAuth 2.0 Client ID**
+5. Configure OAuth consent screen
+6. Set application details:
+   - **Application type**: Web application
+   - **Authorized JavaScript origins**: `http://localhost:8000`
+   - **Authorized redirect URIs**: `http://localhost:8000/static/callback.html`
+7. Copy **Client ID** and **Client Secret**
+
+</details>
+
+#### Environment Configuration
+
+```bash
+# Required
+export FASTAPI_EXAMPLE_OAUTH_CLIENT_ID="your_client_id"
+export FASTAPI_EXAMPLE_OAUTH_CLIENT_SECRET="your_client_secret"
+export FASTAPI_EXAMPLE_OAUTH_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
+
+# Optional - defaults to "github"
+export FASTAPI_EXAMPLE_OAUTH_PROVIDER="github"  # or "google"
+```
+
+#### Testing OAuth Flow
+
+Web interface (recommended):
+1. Start server: `python dev_server.py`
+2. Visit: http://localhost:8000/static/
+3. Choose authentication method:
+   - **OAuth Login**: Click "Login with [Provider]" → authorize → automatic token handling
+   - **API Key**: Click "API Key" tab → enter your key → click "Set API Key"
+4. Test protected endpoints using the math operation form
+
+Both authentication methods provide access to the same endpoints. Your choice is persisted in the browser.
+
+Manual cURL flow:
+```bash
+# 1. Get authorization URL
+curl -X POST "http://localhost:8000/auth/oauth/authorize" \
+  -H "Content-Type: application/json" \
+  -d '{"redirect_uri": "http://localhost:8000/static/callback.html"}'
+
+# 2. Visit the returned URL in browser and authorize
+
+# 3. Exchange code for token
+curl -X POST "http://localhost:8000/auth/oauth/token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "code": "<authorization_code>",
+    "redirect_uri": "http://localhost:8000/static/callback.html"
+  }'
+
+# 4. Use the access token
+curl "http://localhost:8000/math/add?A=10&B=5" \
+  -H "Authorization: Bearer <access_token>"
+```
+
+#### Role Assignment
+
+Roles are embedded in JWT tokens during OAuth flow:
+
+```python
+from fastapi_example.auth.oauth_auth import create_access_token
+
+token = create_access_token(
+    data={"sub": user_email, "provider": "github"},
+    roles=["admin", "user"]  # Assign roles
+)
+```
+
+Access control:
+- `admin` role: Full access to all math endpoints
+- `user` role: Access to all math endpoints
+- No auth: OAuth flow endpoints only
+
+#### Custom Roles and User Management
+
+To implement custom role logic or save users to a database:
+
+1. **Modify role assignment** in [utils/auth_utils.py](src/fastapi_example/utils/auth_utils.py):
+   ```python
+   def get_user_roles(email: str, provider: str) -> list[str]:
+       # Add your custom logic here
+       # Check database, external API, etc.
+       if email in your_admin_list:
+           return ["admin", "user"]
+       return ["user"]
+   ```
+
+2. **User info is logged** when authenticated - check your logs to see all available user data:
+   ```
+   User authenticated: email=user@example.com, provider=github, name=John Doe
+   ```
+
+3. **Save users to database** in [workers/oauth_service.py](src/fastapi_example/workers/oauth_service.py) after `get_user_info_from_provider()`:
+   ```python
+   # Add after extracting user info and roles
+   roles = get_user_roles(email, provider)
+   save_user_to_database(email, name, provider, roles)
+   ```
+
+   Saving roles in the database allows you to:
+   - Track who has authenticated and when
+   - Update roles through database admin tools instead of code changes
+   - Query users by role for management purposes
+
+The user info dict contains all data returned by the OAuth provider (email, name, avatar, etc.) which you can use for role checks or persistence.
+
+## Project Structure
+
+```
+fastapi_example/
+├── src/fastapi_example/
+│   ├── auth/
+│   │   ├── dependencies.py          # Unified auth dependency factory
+│   │   ├── oauth_auth.py            # OAuth token management
+│   │   └── oauth_providers.py       # OAuth provider configurations
+│   ├── routers/
+│   │   ├── math.py                  # Math operations (protected)
+│   │   └── oauth.py                 # OAuth flow endpoints
+│   ├── workers/
+│   │   ├── math_operations.py       # Business logic layer
+│   │   └── oauth_service.py         # OAuth service layer
+│   ├── models/
+│   │   ├── input.py                 # Request/response models
+│   │   └── oauth.py                 # OAuth models
+│   ├── utils/
+│   │   └── auth_utils.py            # Hashing utilities
+│   ├── static/                      # Authentication test frontend
+│   │   ├── index.html               # Main test page (OAuth + API Key)
+│   │   └── callback.html            # OAuth callback handler
+│   ├── custom_logger/               # Logging configuration
+│   ├── main.py                      # FastAPI app entry point
+│   └── settings.py                  # Pydantic settings
+├── tests/
+│   ├── conftest.py                  # Pytest fixtures
+│   └── unit/                        # Unit tests
+└── pyproject.toml                   # Project metadata
+```
+
+### Key Architectural Patterns
+
+| Pattern | Description |
+|---------|-------------|
+| Worker Pattern | Business logic separated from HTTP layer for testability |
+| Unified Auth | Single dependency factory supporting multiple auth methods |
+| Security Utilities | `hash_api_key()` for SHA256 hashing of API keys |
+| Pydantic Models | Automatic validation for all inputs and outputs |
+
+## API Endpoints
+
+### Math Operations (Requires `admin` or `user` role)
+
+| Endpoint | Method | Description | Example |
+|----------|--------|-------------|---------|
+| `/math/add` | GET | Add two numbers | `?A=10&B=5` → `{"result": 15}` |
+| `/math/subtract` | GET | Subtract B from A | `?A=10&B=5` → `{"result": 5}` |
+| `/math/multiply` | GET | Multiply two numbers | `?A=7&B=6` → `{"result": 42}` |
+| `/math/divide` | GET | Divide A by B | `?A=10&B=2` → `{"result": 5}` |
+
+Example request:
+```bash
+curl "http://localhost:8000/math/multiply?A=7&B=6" \
+  -H "Authorization: Bearer your_api_key"
+```
+
+Response:
+```json
+{
+  "operation": "multiply",
+  "a": 7,
+  "b": 6,
+  "result": 42
+}
+```
+
+### OAuth Endpoints (No auth required)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/auth/oauth/provider` | GET | Get configured OAuth provider name |
+| `/auth/oauth/authorize` | POST | Get authorization URL for OAuth flow |
+| `/auth/oauth/token` | POST | Exchange authorization code for JWT token |
+
+## Development
+
+### Running Tests
+
+```bash
+# Run all tests
+pytest
+
+# With coverage report
+pytest --cov=fastapi_example --cov-report=html
+
+# Specific test file
+pytest tests/unit/test_workers.py
+
+# Verbose output
+pytest -v
+```
+
+### Adding New Features
+
+#### Step 1: Add Business Logic
+
+```python
+# src/fastapi_example/workers/math_operations.py
+def power_numbers(a: float, b: float) -> float:
+    """Raise a to the power of b."""
+    return a ** b
+```
+
+#### Step 2: Create Route
+
+```python
+# src/fastapi_example/routers/math.py
+from fastapi_example.workers.math_operations import power_numbers
+from fastapi_example.models.input import InputData
+
+@math_router.post("/power")
+def power(input_data: InputData) -> dict:
+    result = power_numbers(input_data.A, input_data.B)
+    return {
+        "operation": "power",
+        "a": input_data.A,
+        "b": input_data.B,
+        "result": result
+    }
+```
+
+#### Step 3: Add Tests
+
+```python
+# tests/unit/test_workers.py
+from fastapi_example.workers.math_operations import power_numbers
+
+def test_power_numbers():
+    assert power_numbers(2, 3) == 8
+    assert power_numbers(10, 2) == 100
+```
+
+### Environment Variables
+
+Create a `.env` file in the project root:
+
+```bash
+# API Keys (base64-encoded JSON)
+FASTAPI_EXAMPLE_API_KEYS="eyJ0ZXN0Ijp7InVzZXJuYW1lIjoiSm9uYXRoYW4iLCJyb2xlcyI6WyJhZG1pbiIsInVzZXIiXX19"
+
+# OAuth Configuration
+FASTAPI_EXAMPLE_OAUTH_PROVIDER="github"
+FASTAPI_EXAMPLE_OAUTH_CLIENT_ID="your_client_id"
+FASTAPI_EXAMPLE_OAUTH_CLIENT_SECRET="your_client_secret"
+FASTAPI_EXAMPLE_OAUTH_SECRET_KEY="your-32-char-secret-key"
+
+# Application Settings
+FASTAPI_EXAMPLE_APP_NAME="My FastAPI App"
+```
+
+## Installation
+
+### From GitHub
+
+```bash
+pip install "git+https://github.com/jonathanvanleeuwen/fastapi_example.git@v1.0.0"
+```
+
+### From Source
+
+```bash
+git clone https://github.com/jonathanvanleeuwen/fastapi_example.git
+cd fastapi_example
 pip install -e ".[dev]"
 ```
 
-## Option 4: Add to requirements.txt or pyproject.toml
-
-**In requirements.txt:**
+### In requirements.txt
 
 ```txt
 fastapi_example @ git+https://github.com/jonathanvanleeuwen/fastapi_example.git@v1.0.0
 ```
 
-**In pyproject.toml (for projects using PEP 621):**
+## CI/CD
 
-```toml
-[project]
-dependencies = [
-    "fastapi_example @ git+https://github.com/jonathanvanleeuwen/fastapi_example.git@v1.0.0",
-]
-```
+### Pre-commit Hooks
 
-## Building a Wheel File Locally
+Automated code quality checks before each commit:
 
 ```bash
-pip install build
-python -m build --wheel
-# The wheel will be created in the dist/ directory
+# Install pre-commit hooks
+pip install pre-commit
+pre-commit install
+
+# Run manually
+pre-commit run --all-files
 ```
 
+Configured checks:
+- Code formatting (ruff)
+- Import sorting (isort)
+- Trailing whitespace removal
+- End-of-file fixer
+- YAML/JSON syntax validation
+- Case conflict detection
+- Merge conflict detection
+- Private key detection
+- Prevent commits to main branch
 
-# Development Setup
+### Semantic Versioning
 
-1. Create new virtual environment
-   ```bash
-   python -m venv .venv
-   ```
-2. Activate the environment and install library with dev dependencies
-   ```bash
-   pip install -e ".[dev]"
-   ```
-3. Install pre-commit hooks
-   ```bash
-   pip install pre-commit
-   pre-commit install
-   ```
-4. Run pre-commit on all files to ensure everything is properly set up
-   ```bash
-   pre-commit run --all-files
-   ```
-5. Check proper install by running tests
-   ```bash
-   pytest
-   ```
+Automated releases based on commit messages:
 
+| Commit Type | Version Change | Example |
+|-------------|----------------|---------|
+| `fix:` | Patch (1.0.0 → 1.0.1) | `fix: correct calculation error` |
+| `feat:` | Minor (1.0.0 → 1.1.0) | `feat: add power operation` |
+| `BREAKING CHANGE:` | Major (1.0.0 → 2.0.0) | `feat: redesign API`<br>`BREAKING CHANGE: removed old endpoints` |
 
-# GitHub Repository Setup
+## Usage Examples
 
-Complete these steps in order to enable the CI/CD pipeline.
+### Python requests
 
-## Step 1: Create the Release Token (PAT)
+```python
+import requests
 
-The workflow needs a Personal Access Token to push to the protected `main` branch.
+url = "http://localhost:8000/math/add"
+headers = {"Authorization": "Bearer your_api_key"}
+params = {"A": 10, "B": 5}
 
-### Create a Fine-Grained PAT (Recommended - More Secure)
-
-1. Go to [GitHub Settings → Developer settings → Personal access tokens → Fine-grained tokens](https://github.com/settings/tokens?type=beta)
-2. Click **"Generate new token"**
-3. Configure the token:
-   - **Token name:** `RELEASE_TOKEN_fastapi_example` (or similar descriptive name)
-   - **Expiration:** Choose an appropriate duration (recommend 90 days, set a reminder to rotate)
-   - **Repository access:** Select "Only select repositories" → choose this repository
-   - **Permissions:**
-     - **Contents:** Read and write (for pushing commits and tags)
-     - **Metadata:** Read-only (automatically selected)
-4. Click **"Generate token"**
-5. **Copy the token immediately** - you won't see it again!
-
-### Alternative: Classic PAT (Simpler but Broader Access)
-
-If fine-grained tokens don't work for your use case:
-
-1. Go to [GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)](https://github.com/settings/tokens)
-2. Click **"Generate new token (classic)"**
-3. Configure:
-   - **Note:** `RELEASE_TOKEN_fastapi_example`
-   - **Expiration:** Set an appropriate duration
-   - **Scopes:** Select `repo` (full control of private repositories)
-4. Click **"Generate token"** and copy it
-
-## Step 2: Add the Token as a Repository Secret
-
-1. Go to your repository on GitHub
-2. Navigate to **Settings → Secrets and variables → Actions**
-3. Click **"New repository secret"**
-4. Configure:
-   - **Name:** `RELEASE_TOKEN`
-   - **Secret:** Paste your copied PAT
-5. Click **"Add secret"**
-
-## Step 3: Configure Branch Protection with Rulesets
-
-GitHub Rulesets provide modern, flexible branch protection. The PAT allows the workflow to bypass these rules while humans must go through PRs.
-
-1. Go to your repository → **Settings → Rules → Rulesets**
-2. Click **"New ruleset"** → **"New branch ruleset"**
-3. Configure the ruleset:
-   - **Ruleset name:** `Protect main`
-   - **Enforcement status:** Active
-   - **Target branches:** Click "Add target" → "Include by pattern" → enter `main`
-
-4. Enable these rules:
-   - ✅ **Restrict deletions** - Prevent branch deletion
-   - ✅ **Require a pull request before merging**
-     - Required approvals: `1` (or more)
-     - ✅ Dismiss stale pull request approvals when new commits are pushed
-     - ✅ Require conversation resolution before merging
-   - ✅ **Require status checks to pass**
-     - ✅ Require branches to be up to date before merging
-     - Add status checks: `test` (from python-app.yml), `lint` (from python-app.yml)
-   - ✅ **Block force pushes**
-
-5. Click **"Create"**
-
-## Step 4: Restrict Allowed Actions (Optional but Recommended)
-
-Limit which GitHub Actions can run to reduce supply chain attack risk:
-
-1. Go to **Settings → Actions → General**
-2. Under "Actions permissions", select **"Allow [owner], and select non-[owner], actions and reusable workflows"**
-3. In "Allow specified actions and reusable workflows", add:
-   ```
-   actions/checkout@*,
-   actions/setup-python@*,
-   MishaKav/pytest-coverage-comment@*,
-   softprops/action-gh-release@*,
-   ```
-4. Click **"Save"**
-
-## Security Model
-
-This setup provides security through multiple layers:
-
-| Protection | What it prevents |
-|------------|------------------|
-| **CODEOWNERS** | Requires your approval for any workflow changes |
-| **Required PRs** | No direct pushes to main (humans must use PRs) |
-| **Required reviews** | At least one approval needed for every change |
-| **Status checks** | Tests must pass before merge |
-| **PAT as secret** | Token only accessible to workflows, not forks |
-| **Action allowlist** | Only trusted actions can run |
-
-**Why is the PAT safe?**
-- The PAT is stored as a secret, never exposed in logs (GitHub auto-masks it)
-- Forks cannot access repository secrets
-- Any attempt to modify workflows to steal the PAT requires your explicit approval via CODEOWNERS
-- The PAT can only push; it cannot change branch protection rules
-
-
-# Semantic Release
-
-https://python-semantic-release.readthedocs.io/en/latest/
-
-The workflows are triggered when you merge into main!
-
-When committing, use the following format for your commit message:
-
-**Patch release** (1.0.0 → 1.0.1):
-```
-fix: your commit message
+response = requests.get(url, params=params, headers=headers)
+print(response.json())
+# Output: {"operation": "add", "a": 10, "b": 5, "result": 15}
 ```
 
-**Minor release** (1.0.0 → 1.1.0):
-```
-feat: your commit message
+### JavaScript fetch
+
+```javascript
+const response = await fetch('http://localhost:8000/math/add?A=10&B=5', {
+  method: 'GET',
+  headers: {
+    'Authorization': 'Bearer your_api_key'
+  }
+});
+
+const data = await response.json();
+console.log(data);
+// Output: {operation: "add", a: 10, b: 5, result: 15}
 ```
 
-**Major/breaking release** (1.0.0 → 2.0.0):
+### Error Handling
+
+Invalid authentication:
+```bash
+curl "http://localhost:8000/math/add?A=10&B=5" \
+  -H "Authorization: Bearer invalid_key"
+
+# Response: 307 Redirect to /static/
 ```
-feat: your commit message
 
-BREAKING CHANGE: description of breaking change
+Insufficient permissions:
+```bash
+# If user lacks required role
+curl "http://localhost:8000/math/add?A=10&B=5" \
+  -H "Authorization: Bearer user_without_role"
+
+# Response: {"detail": "User does not have required role"}
+# Status: 403 Forbidden
 ```
 
+Invalid input:
+```bash
+curl "http://localhost:8000/math/add?A=not_a_number&B=5" \
+  -H "Authorization: Bearer your_api_key"
 
-# Coverage Report
+# Response: {"detail": [{"type": "float_parsing", "loc": ["query", "A"], ...}]}
+# Status: 422 Unprocessable Entity
+```
+
+## Coverage Report
+
 <!-- Pytest Coverage Comment:Begin -->
 <!-- Pytest Coverage Comment:End -->
+
+## License
+
+This project is licensed under the terms specified in the [LICENSE](LICENSE) file.
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request

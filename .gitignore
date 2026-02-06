@@ -131,3 +131,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# ensure we ignore custom files which are created
+src/fastapi_example/auth/secrets.json
+logs/
